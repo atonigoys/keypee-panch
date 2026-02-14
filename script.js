@@ -59,11 +59,7 @@ function updateNavigation(user) {
         logoutLi.appendChild(logoutBtn);
         navList.appendChild(logoutLi);
     } else {
-        // Login Link
-        const loginLi = document.createElement('li');
-        loginLi.id = 'auth-link';
-        loginLi.innerHTML = `<a href="login.html" class="${window.location.pathname.includes('login.html') ? 'active' : ''}">Login</a>`;
-        navList.appendChild(loginLi);
+        // Login Link hidden as per user request (access via /admin.html)
     }
 }
 
@@ -130,6 +126,7 @@ if (uploadForm) {
         e.preventDefault();
         const category = document.getElementById('upload-category').value;
         const color = document.getElementById('upload-color').value;
+        const isFeatured = document.getElementById('upload-featured').checked;
         const file = document.getElementById('upload-file').files[0];
         const submitBtn = uploadForm.querySelector('button');
 
@@ -176,6 +173,7 @@ if (uploadForm) {
                             category: { stringValue: category },
                             color: { stringValue: color },
                             image: { stringValue: base64String },
+                            isFeatured: { booleanValue: isFeatured },
                             createdAt: { stringValue: new Date().toISOString() }
                         }
                     })
@@ -293,20 +291,30 @@ async function renderGallery() {
         gallery.innerHTML = '';
         allDocs.forEach((data) => {
             const el = document.createElement('div');
-            el.style = "background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden; position: relative;";
+            el.className = 'product-card';
+            el.style.position = 'relative'; // Keep relative for delete button positioning
+
             el.innerHTML = `
-                <div style="height: 150px; background-image: url('${data.image}'); background-size: cover; background-position: center;"></div>
-                <div style="padding: 0.5rem;">
-                    <p style="font-weight: bold; font-size: 0.9rem;">${data.category}</p>
-                    <p style="color: var(--color-text-secondary); font-size: 0.8rem;">${data.color}</p>
-                </div>
+                <div class="product-image" style="background-image: url('${data.image}'); background-size: cover; background-position: center;"></div>
+                <h3>${data.category}</h3>
+                <p style="color: var(--color-text-secondary); font-size: 0.8rem;">${data.color}</p>
             `;
+
+            const isFeatured = data.isFeatured === true || data.isFeatured === "true"; // Handle string/bool
+            const starColor = isFeatured ? '#FFD700' : '#555';
+
+            const starBtn = document.createElement('button');
+            starBtn.innerHTML = "★";
+            starBtn.title = isFeatured ? "Unfeature" : "Feature in New Arrivals";
+            starBtn.style = `position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); color: ${starColor}; border: 1px solid ${starColor}; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center;`;
+            starBtn.onclick = () => toggleFeatured(data.id, isFeatured);
 
             const delBtn = document.createElement('button');
             delBtn.innerHTML = "&times;";
             delBtn.style = "position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px; line-height: 1;";
             delBtn.onclick = () => deleteProduct(data.id);
 
+            el.appendChild(starBtn);
             el.appendChild(delBtn);
             gallery.appendChild(el);
         });
@@ -314,6 +322,30 @@ async function renderGallery() {
     } catch (error) {
         console.error("Error loading gallery:", error);
         gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
+    }
+}
+
+// 4b. Admin: Toggle Featured Status
+async function toggleFeatured(docId, currentStatus) {
+    const newStatus = !currentStatus;
+    try {
+        const headers = await getAuthHeaders();
+        const url = `${BASE_URL}/products/${docId}?updateMask.fieldPaths=isFeatured&key=${API_KEY}`;
+
+        await fetch(url, {
+            method: 'PATCH',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fields: {
+                    isFeatured: { booleanValue: newStatus }
+                }
+            })
+        });
+
+        renderGallery(); // Refresh UI
+    } catch (error) {
+        console.error("Toggle feature error:", error);
+        alert("Failed to update status: " + error.message);
     }
 }
 
@@ -417,4 +449,43 @@ async function initProductsPage() {
 
 function renderStats() {
     // Determine stats from DB or keep static for now
+}
+
+// 8. Public: Render New Arrivals (Home Page)
+if (document.getElementById('new-arrivals-container')) {
+    loadNewArrivals();
+}
+
+async function loadNewArrivals() {
+    const container = document.getElementById('new-arrivals-container');
+    if (!container) return;
+
+    try {
+        container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">Loading...</p>';
+
+        // Reuse existing fetch
+        const allDocs = await fetchProductsRunQuery();
+
+        // Filter for Featured and Sort
+        const featuredDocs = allDocs.filter(d => d.isFeatured === true || d.isFeatured === "true");
+        featuredDocs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const displayDocs = featuredDocs.slice(0, 8); // Limit display
+
+        if (displayDocs.length === 0) {
+            container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">No featured items yet.</p>';
+            return;
+        }
+
+        container.innerHTML = displayDocs.map(img => `
+            <div class="product-card">
+                <div class="product-image" style="background-image: url('${img.image}'); background-size: cover; background-position: center;"></div>
+                <h3>${img.category}</h3>
+                <p style="color: var(--color-text-secondary)">${img.color}</p>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error("Error loading new arrivals:", error);
+        container.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: red;">Failed to load items.</p>`;
+    }
 }

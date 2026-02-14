@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KEYPEE PANCH - Home</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 
 <body>
@@ -51,6 +51,10 @@
                     Shirt</label>
                 <label class="filter-option"><input type="checkbox" value="Poloshirt" data-filter-type="category">
                     Poloshirt</label>
+                <label class="filter-option"><input type="checkbox" value="Longsleeve" data-filter-type="category">
+                    Longsleeve</label>
+                <label class="filter-option"><input type="checkbox" value="Sleeveless" data-filter-type="category">
+                    Sleeveless</label>
                 <label class="filter-option"><input type="checkbox" value="Logo" data-filter-type="category">
                     Logo</label>
             </div>
@@ -70,32 +74,11 @@
             </section>
 
             <section id="products">
-                <h2>New Arrivals</h2>
-                <div class="product-grid" style="padding: 0; margin-top: 2rem;">
-                    <!-- Product 1 -->
-                    <div class="product-card">
-                        <div class="product-image"></div>
-                        <h3>Classic Tee</h3>
-                        <p style="color: var(--color-text-secondary)">$25.00</p>
-                    </div>
-                    <!-- Product 2 -->
-                    <div class="product-card">
-                        <div class="product-image"></div>
-                        <h3>Urban Hoodie</h3>
-                        <p style="color: var(--color-text-secondary)">$45.00</p>
-                    </div>
-                    <!-- Product 3 -->
-                    <div class="product-card">
-                        <div class="product-image"></div>
-                        <h3>Graphic Long Sleeve</h3>
-                        <p style="color: var(--color-text-secondary)">$30.00</p>
-                    </div>
-                    <!-- Product 4 -->
-                    <div class="product-card">
-                        <div class="product-image"></div>
-                        <h3>Vintage Wash</h3>
-                        <p style="color: var(--color-text-secondary)">$28.00</p>
-                    </div>
+                <h2>Featured Design</h2>
+                <div id="new-arrivals-container" class="product-grid" style="padding: 0; margin-top: 2rem;">
+                    <!-- Dynamic Content -->
+                    <p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">Loading new
+                        arrivals...</p>
                 </div>
             </section>
         </div>
@@ -105,7 +88,7 @@
         <p>&copy; 2026 KEYPEE PANCH. All rights reserved.</p>
     </footer>
 
-    <script type="module" src="script.js?v=3"></script>
+    <script type="module" src="script.js?v=4"></script>
 </body>
 
 </html>
