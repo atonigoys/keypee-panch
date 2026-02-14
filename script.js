@@ -88,32 +88,39 @@ if (loginForm) {
 
 // 3. Admin: Upload Image (Base64 to Firestore)
 // Helper: Compress Image
-function compressImage(file, maxWidth, quality) {
+function compressImage(file, maxWidth, quality, statusCallback) {
     return new Promise((resolve, reject) => {
+        if (statusCallback) statusCallback("Reading File...");
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = event => {
+            if (statusCallback) statusCallback("Loading Image...");
             const img = new Image();
             img.src = event.target.result;
             img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
+                if (statusCallback) statusCallback("Compressing...");
+                try {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
 
-                if (width > maxWidth) {
-                    height *= maxWidth / width;
-                    width = maxWidth;
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                } catch (e) {
+                    reject(e);
                 }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                resolve(canvas.toDataURL('image/jpeg', quality));
             };
-            img.onerror = error => reject(error);
+            img.onerror = error => reject(new Error("Failed to load image"));
         };
-        reader.onerror = error => reject(error);
+        reader.onerror = error => reject(new Error("Failed to read file"));
     });
 }
 
@@ -128,13 +135,15 @@ if (uploadForm) {
 
         if (!file) return;
 
-        submitBtn.innerText = "Compressing & Uploading...";
         submitBtn.disabled = true;
 
         try {
-            // Compress image (Max width 800px, 0.6 quality)
-            // This reduces 2MB file to ~50-100KB
-            const base64String = await compressImage(file, 800, 0.6);
+            // Updated to provide feedback
+            const base64String = await compressImage(file, 600, 0.6, (status) => {
+                submitBtn.innerText = status;
+            });
+
+            submitBtn.innerText = "Uploading to Cloud...";
 
             // Save directly to Firestore
             await addDoc(collection(db, "products"), {
