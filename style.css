@@ -1,0 +1,225 @@
+/* KEYPEE PANCH - Main Stylesheet */
+
+:root {
+    --color-bg: #121212;
+    --color-surface: #1e1e1e;
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #b0b0b0;
+    --color-accent: #808080;
+    --color-border: #333333;
+
+    --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 2rem;
+    --spacing-xl: 4rem;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-main);
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    line-height: 1.2;
+    margin-bottom: var(--spacing-md);
+    font-weight: 700;
+}
+
+h1 {
+    font-size: 3rem;
+}
+
+h2 {
+    font-size: 2rem;
+}
+
+h3 {
+    font-size: 1.5rem;
+}
+
+a {
+    color: var(--color-text-primary);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+a:hover {
+    color: var(--color-text-secondary);
+}
+
+/* Navigation */
+header {
+    background-color: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+}
+
+nav ul {
+    display: flex;
+    gap: var(--spacing-lg);
+    list-style: none;
+}
+
+nav a.active {
+    border-bottom: 2px solid var(--color-text-primary);
+}
+
+/* Layout */
+main {
+    flex: 1;
+    display: flex;
+    max-width: 1440px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.container {
+    width: 100%;
+    padding: var(--spacing-lg);
+}
+
+/* Footer */
+footer {
+    background-color: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    padding: var(--spacing-lg);
+    text-align: center;
+    color: var(--color-text-secondary);
+    margin-top: auto;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background-color: var(--color-text-primary);
+    color: var(--color-bg);
+    font-weight: 600;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    border: none;
+}
+
+.btn:hover {
+    background-color: var(--color-text-secondary);
+    color: var(--color-surface);
+}
+
+/* Filter Panel (Sidebar) */
+.sidebar {
+    width: 300px;
+    background-color: var(--color-surface);
+    border-right: 1px solid var(--color-border);
+    padding: var(--spacing-lg);
+    flex-shrink: 0;
+
+    /* Sticky Positioning */
+    position: sticky;
+    top: 73px;
+    /* Height of header (approx) + some margin if desired, or just top:0 if under header */
+    height: calc(100vh - 73px);
+    overflow-y: auto;
+}
+
+.filter-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.filter-group h3 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text-secondary);
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+}
+
+/* Product Grid */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    flex: 1;
+}
+
+.product-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    padding: var(--spacing-md);
+    border-radius: 8px;
+    transition: transform 0.2s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--color-text-secondary);
+}
+
+.product-image {
+    width: 100%;
+    aspect-ratio: 1/1;
+    background-color: #2a2a2a;
+    border-radius: 4px;
+    margin-bottom: var(--spacing-md);
+    background-image: linear-gradient(45deg, #2a2a2a 25%, #333333 25%, #333333 50%, #2a2a2a 50%, #2a2a2a 75%, #333333 75%, #333333 100%);
+    background-size: 20px 20px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    main {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    nav ul {
+        gap: var(--spacing-md);
+        font-size: 0.9rem;
+    }
+}

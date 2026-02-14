@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEYPEE PANCH - Home</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <div class="logo">KEYPEE PANCH</div>
+        <nav>
+            <ul>
+                <li><a href="index.html" class="active">Home</a></li>
+                <li><a href="services.html">Services</a></li>
+                <li><a href="social.html">Social</a></li>
+                <li><a href="offer.html">Offer</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Product Filter Panel (Left Sidebar) -->
+        <aside class="sidebar">
+            <div class="filter-group">
+                <h3>Colors</h3>
+                <label class="filter-option"><input type="checkbox" value="Black" data-filter-type="color">
+                    Black</label>
+                <label class="filter-option"><input type="checkbox" value="White" data-filter-type="color">
+                    White</label>
+                <label class="filter-option"><input type="checkbox" value="Blue" data-filter-type="color"> Blue</label>
+                <label class="filter-option"><input type="checkbox" value="Red" data-filter-type="color"> Red</label>
+                <label class="filter-option"><input type="checkbox" value="Green" data-filter-type="color">
+                    Green</label>
+                <label class="filter-option"><input type="checkbox" value="Yellow" data-filter-type="color">
+                    Yellow</label>
+                <label class="filter-option"><input type="checkbox" value="Orange" data-filter-type="color">
+                    Orange</label>
+                <label class="filter-option"><input type="checkbox" value="Purple" data-filter-type="color">
+                    Purple</label>
+                <label class="filter-option"><input type="checkbox" value="Pink" data-filter-type="color"> Pink</label>
+                <label class="filter-option"><input type="checkbox" value="Cyan" data-filter-type="color"> Cyan</label>
+                <label class="filter-option"><input type="checkbox" value="Beige" data-filter-type="color">
+                    Beige</label>
+            </div>
+            <div class="filter-group">
+                <h3>Categories</h3>
+                <label class="filter-option"><input type="checkbox" value="Shirt" data-filter-type="category">
+                    Shirt</label>
+                <label class="filter-option"><input type="checkbox" value="Poloshirt" data-filter-type="category">
+                    Poloshirt</label>
+                <label class="filter-option"><input type="checkbox" value="Logo" data-filter-type="category">
+                    Logo</label>
+            </div>
+            <div class="filter-group">
+                <button id="apply-filters" class="btn" style="width: 100%">Apply Filters</button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="container">
+            <section class="hero"
+                style="text-align: center; margin-bottom: 4rem; padding: 4rem 0; background: var(--color-surface); border-radius: 8px;">
+                <h1>Custom T-Shirt Printing</h1>
+                <p style="color: var(--color-text-secondary); margin-bottom: 2rem;">Premium quality prints. Fast
+                    turnaround. Your design, our passion.</p>
+                <a href="#products" class="btn">Shop Collection</a>
+            </section>
+
+            <section id="products">
+                <h2>New Arrivals</h2>
+                <div class="product-grid" style="padding: 0; margin-top: 2rem;">
+                    <!-- Product 1 -->
+                    <div class="product-card">
+                        <div class="product-image"></div>
+                        <h3>Classic Tee</h3>
+                        <p style="color: var(--color-text-secondary)">$25.00</p>
+                    </div>
+                    <!-- Product 2 -->
+                    <div class="product-card">
+                        <div class="product-image"></div>
+                        <h3>Urban Hoodie</h3>
+                        <p style="color: var(--color-text-secondary)">$45.00</p>
+                    </div>
+                    <!-- Product 3 -->
+                    <div class="product-card">
+                        <div class="product-image"></div>
+                        <h3>Graphic Long Sleeve</h3>
+                        <p style="color: var(--color-text-secondary)">$30.00</p>
+                    </div>
+                    <!-- Product 4 -->
+                    <div class="product-card">
+                        <div class="product-image"></div>
+                        <h3>Vintage Wash</h3>
+                        <p style="color: var(--color-text-secondary)">$28.00</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 KEYPEE PANCH. All rights reserved.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

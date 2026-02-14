@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEYPEE PANCH - Browsing Products</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <div class="logo">KEYPEE PANCH</div>
+        <nav>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="services.html">Services</a></li>
+                <li><a href="social.html">Social</a></li>
+                <li><a href="offer.html">Offer</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Sticky Product Filter Panel -->
+        <aside class="sidebar">
+            <div class="filter-group">
+                <h3>Colors</h3>
+                <label class="filter-option"><input type="checkbox" value="Black" data-filter-type="color">
+                    Black</label>
+                <label class="filter-option"><input type="checkbox" value="White" data-filter-type="color">
+                    White</label>
+                <label class="filter-option"><input type="checkbox" value="Blue" data-filter-type="color"> Blue</label>
+                <label class="filter-option"><input type="checkbox" value="Red" data-filter-type="color"> Red</label>
+                <label class="filter-option"><input type="checkbox" value="Green" data-filter-type="color">
+                    Green</label>
+                <label class="filter-option"><input type="checkbox" value="Yellow" data-filter-type="color">
+                    Yellow</label>
+                <label class="filter-option"><input type="checkbox" value="Orange" data-filter-type="color">
+                    Orange</label>
+                <label class="filter-option"><input type="checkbox" value="Purple" data-filter-type="color">
+                    Purple</label>
+                <label class="filter-option"><input type="checkbox" value="Pink" data-filter-type="color"> Pink</label>
+                <label class="filter-option"><input type="checkbox" value="Cyan" data-filter-type="color"> Cyan</label>
+                <label class="filter-option"><input type="checkbox" value="Beige" data-filter-type="color">
+                    Beige</label>
+            </div>
+            <div class="filter-group">
+                <h3>Categories</h3>
+                <label class="filter-option"><input type="checkbox" value="Shirt" data-filter-type="category">
+                    Shirt</label>
+                <label class="filter-option"><input type="checkbox" value="Poloshirt" data-filter-type="category">
+                    Poloshirt</label>
+                <label class="filter-option"><input type="checkbox" value="Logo" data-filter-type="category">
+                    Logo</label>
+            </div>
+            <div class="filter-group">
+                <button id="apply-filters" class="btn" style="width: 100%">Apply Filters</button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="container">
+            <section>
+                <h1 id="page-title">Filtered Results</h1>
+                <div class="product-grid" id="product-results" style="padding: 0; margin-top: 2rem;">
+                    <!-- Results will be injected here -->
+                    <p style="color: var(--color-text-secondary); grid-column: 1/-1;">Loading products...</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 KEYPEE PANCH. All rights reserved.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

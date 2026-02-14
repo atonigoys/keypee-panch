@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEYPEE PANCH - Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <div class="logo">KEYPEE PANCH <span
+                style="font-size: 0.8rem; background: var(--color-text-primary); color: var(--color-bg); padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 10px;">ADMIN</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="services.html">Services</a></li>
+                <li><a href="social.html">Social</a></li>
+                <li><a href="offer.html">Offer</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="container">
+            <h1>Admin Dashboard</h1>
+            <p style="color: var(--color-text-secondary); margin-bottom: 2rem;">Manage orders, products, and users.</p>
+
+            <div
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-bottom: 4rem;">
+                <!-- Stat Card 1 -->
+                <div
+                    style="background: var(--color-surface); padding: 2rem; border-radius: 8px; border: 1px solid var(--color-border);">
+                    <h3 style="color: var(--color-text-secondary); font-size: 0.9rem; text-transform: uppercase;">Total
+                        Orders</h3>
+                    <p style="font-size: 2.5rem; font-weight: bold;">1,248</p>
+                    <span style="color: #4caf50;">+12% this week</span>
+                </div>
+                <!-- Stat Card 2 -->
+                <div
+                    style="background: var(--color-surface); padding: 2rem; border-radius: 8px; border: 1px solid var(--color-border);">
+                    <h3 style="color: var(--color-text-secondary); font-size: 0.9rem; text-transform: uppercase;">
+                        Revenue</h3>
+                    <p style="font-size: 2.5rem; font-weight: bold;">$45.2k</p>
+                    <span style="color: #4caf50;">+8% this month</span>
+                </div>
+                <!-- Stat Card 3 -->
+                <div
+                    style="background: var(--color-surface); padding: 2rem; border-radius: 8px; border: 1px solid var(--color-border);">
+                    <h3 style="color: var(--color-text-secondary); font-size: 0.9rem; text-transform: uppercase;">
+                        Pending Shipments</h3>
+                    <p style="font-size: 2.5rem; font-weight: bold;">34</p>
+                    <span style="color: #ff9800;">Action needed</span>
+                </div>
+            </div>
+
+            <!-- Upload Section -->
+            <div
+                style="background: var(--color-surface); padding: 2rem; border-radius: 8px; border: 1px solid var(--color-border); margin-bottom: 2rem;">
+                <h2 style="margin-bottom: 1.5rem;">Upload New Design</h2>
+                <form id="upload-form"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; align-items: end;">
+                    <div class="form-group">
+                        <label
+                            style="display: block; margin-bottom: 0.5rem; color: var(--color-text-secondary);">Category</label>
+                        <select id="upload-category"
+                            style="width: 100%; padding: 0.75rem; background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text-primary); border-radius: 4px;">
+                            <option value="Shirt">Shirt</option>
+                            <option value="Poloshirt">Poloshirt</option>
+                            <option value="Logo">Logo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label
+                            style="display: block; margin-bottom: 0.5rem; color: var(--color-text-secondary);">Color</label>
+                        <select id="upload-color"
+                            style="width: 100%; padding: 0.75rem; background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text-primary); border-radius: 4px;">
+                            <option value="Black">Black</option>
+                            <option value="White">White</option>
+                            <option value="Blue">Blue</option>
+                            <option value="Red">Red</option>
+                            <option value="Green">Green</option>
+                            <option value="Yellow">Yellow</option>
+                            <option value="Orange">Orange</option>
+                            <option value="Purple">Purple</option>
+                            <option value="Pink">Pink</option>
+                            <option value="Cyan">Cyan</option>
+                            <option value="Beige">Beige</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--color-text-secondary);">Image
+                            File</label>
+                        <input type="file" id="upload-file" accept="image/*" required
+                            style="width: 100%; padding: 0.5rem; background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text-primary); border-radius: 4px;">
+                    </div>
+                    <div>
+                        <button type="submit" class="btn" style="width: 100%;">Upload Design</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Recent Uploads Gallery -->
+            <h2 style="margin-bottom: 1.5rem;">Recent Uploads</h2>
+            <div id="upload-gallery"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 4rem;">
+                <!-- Gallery items will be injected here by JS -->
+                <p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">No images uploaded
+                    yet.</p>
+            </div>
+
+            <h2 style="margin-bottom: 1.5rem;">Recent Orders</h2>
+            <div
+                style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead style="background: #2a2a2a;">
+                        <tr>
+                            <th style="padding: 1rem; border-bottom: 1px solid var(--color-border);">Order ID</th>
+                            <th style="padding: 1rem; border-bottom: 1px solid var(--color-border);">Customer</th>
+                            <th style="padding: 1rem; border-bottom: 1px solid var(--color-border);">Status</th>
+                            <th style="padding: 1rem; border-bottom: 1px solid var(--color-border);">Total</th>
+                            <th style="padding: 1rem; border-bottom: 1px solid var(--color-border);">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);">#ORD-001</td>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);">John Doe</td>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);"><span
+                                    style="background: #e0f2f1; color: #00695c; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">Completed</span>
+                            </td>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);">$120.00</td>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);"><button class="btn"
+                                    style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">View</button></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);">#ORD-002</td>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);">Jane Smith</td>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);"><span
+                                    style="background: #fff3e0; color: #e65100; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">Pending</span>
+                            </td>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);">$45.00</td>
+                            <td style="padding: 1rem; border-bottom: 1px solid var(--color-border);"><button class="btn"
+                                    style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">View</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 KEYPEE PANCH. All rights reserved.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
