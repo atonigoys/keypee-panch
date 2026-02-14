@@ -87,6 +87,37 @@ if (loginForm) {
 }
 
 // 3. Admin: Upload Image (Base64 to Firestore)
+// Helper: Compress Image
+function compressImage(file, maxWidth, quality) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = event => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height *= maxWidth / width;
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = error => reject(error);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
+
+// 3. Admin: Upload Image (Compressed Base64 to Firestore)
 if (uploadForm) {
     uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -97,40 +128,32 @@ if (uploadForm) {
 
         if (!file) return;
 
-        // Limit file size (e.g., 500KB) to prevent Firestore issues
-        if (file.size > 500000) {
-            alert("File is too large! Please choose an image under 500KB.");
-            return;
-        }
-
-        submitBtn.innerText = "Uploading...";
+        submitBtn.innerText = "Compressing & Uploading...";
         submitBtn.disabled = true;
 
-        const reader = new FileReader();
-        reader.onloadend = async function () {
-            try {
-                const base64String = reader.result;
+        try {
+            // Compress image (Max width 800px, 0.6 quality)
+            // This reduces 2MB file to ~50-100KB
+            const base64String = await compressImage(file, 800, 0.6);
 
-                // Save directly to Firestore
-                await addDoc(collection(db, "products"), {
-                    category: category,
-                    color: color,
-                    image: base64String, // Storing Base64 directly
-                    createdAt: new Date().toISOString()
-                });
+            // Save directly to Firestore
+            await addDoc(collection(db, "products"), {
+                category: category,
+                color: color,
+                image: base64String,
+                createdAt: new Date().toISOString()
+            });
 
-                alert("Upload Successful!");
-                uploadForm.reset();
-                renderGallery();
-            } catch (error) {
-                console.error("Upload error:", error);
-                alert("Upload failed: " + error.message);
-            } finally {
-                submitBtn.innerText = "Upload Design";
-                submitBtn.disabled = false;
-            }
+            alert("Upload Successful!");
+            uploadForm.reset();
+            renderGallery();
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("Upload failed: " + error.message);
+        } finally {
+            submitBtn.innerText = "Upload Design";
+            submitBtn.disabled = false;
         }
-        reader.readAsDataURL(file);
     });
 }
 
