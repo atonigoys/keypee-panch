@@ -145,20 +145,66 @@ if (uploadForm) {
 
             submitBtn.innerText = "Uploading to Cloud...";
 
-            // Save directly to Firestore
-            await addDoc(collection(db, "products"), {
-                category: category,
-                color: color,
-                image: base64String,
-                createdAt: new Date().toISOString()
-            });
+            // Debug: Check size
+            const sizeInBytes = new Blob([base64String]).size;
+            const sizeInKB = (sizeInBytes / 1024).toFixed(2);
+            console.log(`Payload size: ${sizeInKB} KB`);
 
-            alert("Upload Successful!");
+            if (sizeInBytes > 1000000) { // 1MB limit check
+                throw new Error(`Image is too large (${sizeInKB} KB). Max is 1MB.`);
+            }
+
+            // Timeout Helper
+            const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out")), ms));
+
+            // REST API Fallback (Bypasses Firewall/SDK issues)
+            const uploadToFirestoreRest = async () => {
+                const user = auth.currentUser;
+                if (!user) throw new Error("User not authenticated");
+
+                const token = await user.getIdToken();
+                const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents/products?key=${API_KEY}`;
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fields: {
+                            category: { stringValue: category },
+                            color: { stringValue: color },
+                            image: { stringValue: base64String },
+                            createdAt: { stringValue: new Date().toISOString() }
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.text();
+                    throw new Error(`REST API Error: ${response.status} ${err}`);
+                }
+
+                return await response.json();
+            };
+
+            // Race REST API against 15s timeout
+            await Promise.race([
+                uploadToFirestoreRest(),
+                timeout(15000)
+            ]);
+
+            alert(`Upload Successful! (${sizeInKB} KB)`);
             uploadForm.reset();
             renderGallery();
         } catch (error) {
             console.error("Upload error:", error);
-            alert("Upload failed: " + error.message);
+            if (error.message === "Request timed out") {
+                alert("Upload timed out (15s). \nStealth Mode failed. Internet is very restricted.");
+            } else {
+                alert("Upload failed: " + error.message);
+            }
         } finally {
             submitBtn.innerText = "Upload Design";
             submitBtn.disabled = false;
@@ -166,23 +212,86 @@ if (uploadForm) {
     });
 }
 
-// 4. Admin: Render Gallery
+// --- REST API HELPERS (Bypass Firewall) ---
+const PROJECT_ID = "keypeepanch-786b9";
+const API_KEY = "AIzaSyDmbvH3x89JLk-uj_QoyuwVLXMQ3EGImao"; // Required for REST API Quota/Auth
+const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents`;
+
+async function getAuthHeaders() {
+    const user = auth.currentUser;
+    if (!user) {
+        console.warn("getAuthHeaders: No user logged in.");
+        return {};
+    }
+    console.log("getAuthHeaders: Getting token for user", user.email);
+    try {
+        const token = await user.getIdToken();
+        return { 'Authorization': `Bearer ${token}` };
+    } catch (e) {
+        console.error("getAuthHeaders Error:", e);
+        return {};
+    }
+}
+
+function parseFirestoreDoc(doc) {
+    const data = {};
+    if (doc.fields) {
+        for (const [key, value] of Object.entries(doc.fields)) {
+            // Simplify parsing for our specific string-heavy data
+            data[key] = value.stringValue || value.booleanValue || value.integerValue || value.timestampValue || "";
+        }
+    }
+    // Extract ID from full path "projects/.../documents/products/ID"
+    const id = doc.name.split('/').pop();
+    return { id, ...data };
+}
+
+// Helper: Fetch products using POST-based :runQuery (bypasses GET firewall block)
+async function fetchProductsRunQuery() {
+    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents:runQuery`;
+    const headers = await getAuthHeaders();
+    headers['Content-Type'] = 'application/json';
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            structuredQuery: {
+                from: [{ collectionId: "products" }]
+            }
+        })
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`API Error (${response.status}): ${errText}`);
+    }
+
+    const results = await response.json();
+    // runQuery returns [{document: {...}}, ...] - filter out empty results
+    return results
+        .filter(r => r.document)
+        .map(r => parseFirestoreDoc(r.document));
+}
+
+// 4. Admin: Render Gallery (REST API via runQuery POST)
 async function renderGallery() {
     if (!gallery) return;
     gallery.innerHTML = '<p style="grid-column: 1/-1;">Loading images...</p>';
 
     try {
-        const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
+        const allDocs = await fetchProductsRunQuery();
 
-        if (querySnapshot.empty) {
+        if (allDocs.length === 0) {
             gallery.innerHTML = '<p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">No images uploaded yet.</p>';
             return;
         }
 
+        // Sort Client-Side (descending by createdAt)
+        allDocs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
         gallery.innerHTML = '';
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
+        allDocs.forEach((data) => {
             const el = document.createElement('div');
             el.style = "background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden; position: relative;";
             el.innerHTML = `
@@ -196,7 +305,7 @@ async function renderGallery() {
             const delBtn = document.createElement('button');
             delBtn.innerHTML = "&times;";
             delBtn.style = "position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px; line-height: 1;";
-            delBtn.onclick = () => deleteProduct(doc.id);
+            delBtn.onclick = () => deleteProduct(data.id);
 
             el.appendChild(delBtn);
             gallery.appendChild(el);
@@ -204,17 +313,22 @@ async function renderGallery() {
 
     } catch (error) {
         console.error("Error loading gallery:", error);
-        gallery.innerHTML = `<p style="color: red;">Error loading gallery: ${error.message}</p>`;
+        gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
     }
 }
 
-// 5. Admin: Delete Product
+// 5. Admin: Delete Product (REST API)
 async function deleteProduct(docId) {
     if (!confirm('Are you sure you want to remove this image?')) return;
 
     try {
-        // Delete from Firestore
-        await deleteDoc(doc(db, "products", docId));
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${BASE_URL}/products/${docId}?key=${API_KEY}`, {
+            method: 'DELETE',
+            headers
+        });
+
+        if (!response.ok) throw new Error("Delete failed: " + response.status);
 
         renderGallery();
     } catch (error) {
@@ -269,13 +383,12 @@ async function initProductsPage() {
     productGrid.innerHTML = '<p>Loading products...</p>';
 
     try {
-        // Fetch ALL products then filter client-side (simplest for avoiding complex Firestore composite indices right now)
-        const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
+        // Fetch ALL products via POST-based runQuery (bypasses GET firewall block)
+        const allDocs = await fetchProductsRunQuery();
+        allDocs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         const filteredDocs = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
+        allDocs.forEach((data) => {
             const colorMatch = colors.length === 0 || colors.includes(data.color);
             const categoryMatch = categories.length === 0 || categories.includes(data.category);
 

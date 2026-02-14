@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Firebase Deep Diagnostic v5 (The Prober)</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #222;
+            color: #eee;
+            padding: 2rem;
+        }
+
+        button {
+            padding: 15px 30px;
+            cursor: pointer;
+            font-weight: bold;
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #666;
+        }
+
+        #log {
+            background: #000;
+            padding: 1rem;
+            border: 1px solid #444;
+            height: 350px;
+            overflow-y: scroll;
+            margin-top: 1rem;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+
+        .error {
+            color: #ff5555;
+            font-weight: bold;
+            border: 1px solid #ff5555;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔥 Firebase Deep Diagnostic v5 (Name Finder)</h1>
+
+    <div id="protocol-error" class="error">
+        ⚠️ STOP! Run this on http://localhost:8000/diagnostic.html
+    </div>
+
+    <p>We are going to guess the database name until one works.</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+        <button id="btn-auth">1. Login</button>
+        <button id="btn-probe" style="background-color: #007bff;">2. PROBE DATABASE NAMES</button>
+        <button id="btn-rest-read" style="background-color: #2196F3;">3. TEST AUTH READ</button>
+        <button id="btn-public-read" style="background-color: #4CAF50;">4. TEST READ METHODS</button>
+        <button id="btn-runquery" style="background-color: #FF9800;">5. TEST POST READ (runQuery)</button>
+    </div>
+
+    <div id="log">Initializing...</div>
+
+    <script>
+        if (window.location.protocol === 'file:') document.getElementById('protocol-error').style.display = 'block';
+    </script>
+
+    <script type="module">
+        import { auth } from "./firebase-config.js";
+        import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const logDiv = document.getElementById('log');
+        const log = (msg, type = 'info') => {
+            const el = document.createElement('div');
+            el.innerHTML = `[${new Date().toLocaleTimeString()}] <span style="color: ${type === 'error' ? '#ff5555' : type === 'success' ? '#55ff55' : type === 'warning' ? '#ffff55' : '#eee'}">${msg}</span>`;
+            logDiv.appendChild(el);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+
+        log("System Ready.", 'success');
+
+        document.getElementById('btn-auth').addEventListener('click', async () => {
+            log("Attempting Auth...", 'warning');
+            try {
+                await signInWithEmailAndPassword(auth, "admin@keypeepanch.com", "password123");
+                log("✅ Auth Success! " + auth.currentUser.email, 'success');
+            } catch (e) {
+                log("❌ Auth Failed: " + e.message, 'error');
+            }
+        });
+
+        document.getElementById('btn-probe').addEventListener('click', async () => {
+            log("🕵️ Probing Database Names...", 'warning');
+            const user = auth.currentUser;
+            if (!user) { log("❌ Login first!", 'error'); return; }
+
+            const token = await user.getIdToken();
+            const projectId = "keypeepanch-786b9";
+
+            // Names to try
+            const names = ["(default)", "default", "keypeepanch-786b9"];
+
+            for (const name of names) {
+                log(`-----------------------------------`);
+                log(`Testing Database Name: "${name}"...`);
+
+                const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${name}/documents/test_probe`;
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fields: { probe: { booleanValue: true } } })
+                    });
+
+                    if (response.ok) {
+                        log(`✅✅ SUCCESS! FOUND DATABASE: "${name}"`, 'success');
+                        log(`👉 PLEASE TELL THE DEVELOPER: "The database name is ${name}"`, 'success');
+                        return; // Stop after finding it
+                    } else {
+                        const txt = await response.text();
+                        if (response.status === 404) {
+                            log(`❌ Failed (404): Not Found`, 'error');
+                        } else {
+                            log(`✅ FOUND IT (But Perms/Other Error)! Name: "${name}"`, 'success');
+                            log(`Status: ${response.status} - ${txt}`, 'warning');
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    log(`❌ Network Error on ${name}: ${e.message}`, 'error');
+                }
+            }
+            log(`-----------------------------------`);
+            log("❌ ALL ATTEMPTS FAILED. The database truly does not exist or Project ID is wrong.", 'error');
+        });
+
+        document.getElementById('btn-rest-read').addEventListener('click', async () => {
+            log("Attempting REST Read...", 'warning');
+            const PROJECT_ID = "keypeepanch-786b9";
+            const API_KEY = "AIzaSyDmbvH3x89JLk-uj_QoyuwVLXMQ3EGImao";
+            const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents/products?key=${API_KEY}`;
+
+            try {
+                let headers = {};
+                const user = auth.currentUser;
+                if (user) {
+                    const token = await user.getIdToken();
+                    headers['Authorization'] = `Bearer ${token}`;
+                    log("Token attached.", 'success');
+                } else {
+                    log("No user logged in. Trying public read...", 'warning');
+                }
+
+                const response = await fetch(url, { headers });
+
+                if (!response.ok) {
+                    const txt = await response.text();
+                    log(`❌ REST Failed: ${response.status} - ${txt}`, 'error');
+                    if (response.status === 403) log("👉 CAUSE: Firebase Security Rules are blocking access. Please Publish 'allow read: if true;'", 'error');
+                } else {
+                    const json = await response.json();
+                    log(`✅ REST Read Success! Found ${(json.documents || []).length} items.`, 'success');
+                }
+            } catch (e) {
+                log("❌ Network Error: " + e.message, 'error');
+            }
+        });
+
+        document.getElementById('btn-public-read').addEventListener('click', async () => {
+            const PROJECT_ID = "keypeepanch-786b9";
+            const API_KEY = "AIzaSyDmbvH3x89JLk-uj_QoyuwVLXMQ3EGImao";
+            const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents/products`;
+
+            // Test 1: Auth Token ONLY (No API Key) - same as writes
+            log(`--- Test A: Auth Token ONLY (no API key) ---`, 'warning');
+            const user = auth.currentUser;
+            if (user) {
+                try {
+                    const token = await user.getIdToken();
+                    const r1 = await fetch(BASE, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (r1.ok) {
+                        const j = await r1.json();
+                        log(`✅✅ AUTH-ONLY READ SUCCESS! ${(j.documents || []).length} items!`, 'success');
+                        log(`💡 FIX: Remove API Key from read URLs. Use Auth token only.`, 'success');
+                    } else {
+                        log(`❌ Auth-only: ${r1.status}`, 'error');
+                    }
+                } catch (e) { log(`❌ Auth-only error: ${e.message}`, 'error'); }
+            } else {
+                log("⚠️ Not logged in, skipping auth-only test.", 'warning');
+            }
+
+            // Test 2: API Key ONLY (No Auth Token)
+            log(`--- Test B: API Key ONLY (no token) ---`, 'warning');
+            try {
+                const r2 = await fetch(`${BASE}?key=${API_KEY}`);
+                if (r2.ok) {
+                    const j = await r2.json();
+                    log(`✅ API-Key-only: ${(j.documents || []).length} items`, 'success');
+                } else {
+                    log(`❌ API-Key-only: ${r2.status}`, 'error');
+                }
+            } catch (e) { log(`❌ API-Key error: ${e.message}`, 'error'); }
+
+            // Test 3: BOTH
+            log(`--- Test C: Both Auth + API Key ---`, 'warning');
+            if (user) {
+                try {
+                    const token = await user.getIdToken();
+                    const r3 = await fetch(`${BASE}?key=${API_KEY}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (r3.ok) {
+                        const j = await r3.json();
+                        log(`✅ Both: ${(j.documents || []).length} items`, 'success');
+                    } else {
+                        log(`❌ Both: ${r3.status}`, 'error');
+                    }
+                } catch (e) { log(`❌ Both error: ${e.message}`, 'error'); }
+            }
+            log(`--- DONE ---`, 'warning');
+        });
+
+        document.getElementById('btn-runquery').addEventListener('click', async () => {
+            log("🔥 Testing POST-based runQuery (bypasses GET blocks)...", 'warning');
+            const PROJECT_ID = "keypeepanch-786b9";
+            const user = auth.currentUser;
+            if (!user) { log("❌ Login first!", 'error'); return; }
+
+            const token = await user.getIdToken();
+            const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents:runQuery`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        structuredQuery: {
+                            from: [{ collectionId: "products" }],
+                            limit: 10
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    const results = await response.json();
+                    const docs = results.filter(r => r.document);
+                    log(`✅✅ runQuery SUCCESS! Found ${docs.length} documents!`, 'success');
+                    docs.forEach(r => {
+                        const name = r.document.name.split('/').pop();
+                        const cat = r.document.fields?.category?.stringValue || '?';
+                        log(`   📄 ${name} (${cat})`, 'success');
+                    });
+                    log(`💡 FIX: Switch ALL reads in script.js to use :runQuery POST!`, 'success');
+                } else {
+                    const txt = await response.text();
+                    log(`❌ runQuery Failed: ${response.status} - ${txt}`, 'error');
+                }
+            } catch (e) {
+                log(`❌ Network Error: ${e.message}`, 'error');
+            }
+        });
+    </script>
+</body>
+
+</html>
