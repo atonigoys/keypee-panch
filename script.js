@@ -72,31 +72,43 @@ function updateNavigation() {
                     const featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
                     const unfeaturedIds = JSON.parse(localStorage.getItem('kp_unfeatured_ids') || '[]');
 
-                    const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
-                    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image/tags`;
+                    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/explicit`;
 
-                    // Helper to update tag
-                    const updateTag = async (id, cmd) => {
-                        await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ tag: 'featured', public_ids: [id], command: cmd })
-                        });
+                    // Helper to update context
+                    const updateContext = async (id, isFeatured) => {
+                        const timestamp = Math.round(Date.now() / 1000);
+                        const contextVal = isFeatured ? 'featured=true' : 'featured=false';
+
+                        const paramsToSign = {
+                            context: contextVal,
+                            public_id: id,
+                            timestamp: timestamp,
+                            type: 'upload' // Explicit requires type='upload' context for signatures typically
+                        };
+                        const signature = await generateSignature(paramsToSign);
+
+                        const formData = new FormData();
+                        formData.append('public_id', id);
+                        formData.append('type', 'upload');
+                        formData.append('context', contextVal);
+                        formData.append('timestamp', timestamp);
+                        formData.append('api_key', CLOUDINARY_API_KEY);
+                        formData.append('signature', signature);
+
+                        await fetch(url, { method: 'POST', body: formData });
                     };
 
                     // Process all featured
                     for (const id of featuredIds) {
-                        await updateTag(id, 'add');
+                        await updateContext(id, true);
                     }
 
                     // Process all unfeatured
                     for (const id of unfeaturedIds) {
-                        await updateTag(id, 'remove');
+                        await updateContext(id, false);
                     }
 
-                    alert("Sync Complete! Public site should be updated.");
-                    // Clear local list of 'unfeatured' since cloud is now consistent? 
-                    // No, keep it for strict local override potential.
+                    alert("Sync Complete! Context updated. Wait 30s and refresh public site.");
 
                 } catch (e) {
                     console.error("Sync failed", e);
@@ -608,42 +620,50 @@ async function toggleFeatured(publicId, currentTags) {
                 toggleBtn.style.borderColor = isFeatured ? '#ff4444' : 'gold';
                 toggleBtn.style.color = isFeatured ? '#ff4444' : 'gold';
                 toggleBtn.style.background = isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)';
-                // Update onclick to reflect new state
-                toggleBtn.onclick = () => toggleFeatured(publicId, newTags);
+                // Call Cloudinary Upload API ('explicit' method) to update Context
+                // This works client-side (CORS allowed) and merges context (safe)
+                const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/explicit`;
+
+                try {
+                    const timestamp = Math.round(Date.now() / 1000);
+                    const contextVal = isFeatured ? 'featured=true' : 'featured=false';
+
+                    // Params to sign (alphabetical order required by Cloudinary)
+                    // public_id, timestamp, type='upload', context
+                    const paramsToSign = {
+                        context: contextVal,
+                        public_id: publicId,
+                        timestamp: timestamp,
+                        type: 'upload'
+                    };
+                    const signature = await generateSignature(paramsToSign);
+
+                    const formData = new FormData();
+                    formData.append('public_id', publicId);
+                    formData.append('type', 'upload');
+                    formData.append('context', contextVal);
+                    formData.append('timestamp', timestamp);
+                    formData.append('api_key', CLOUDINARY_API_KEY);
+                    formData.append('signature', signature);
+
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!resp.ok) {
+                        const err = await resp.json();
+                        throw new Error(err.error?.message || 'Failed to update');
+                    }
+
+                    console.log(isFeatured ? 'Context set to Featured!' : 'Context set to Unfeatured!');
+                } catch (error) {
+                    console.error('Toggle error:', error);
+                    alert('Toggle failed: ' + error.message);
+                    // Re-render only on failure to restore correct state
+                    renderGallery();
+                }
             }
-        }
-
-        // Call Cloudinary Admin API (Reliable Sync)
-        const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image/tags`;
-
-        try {
-            // Use Basic Auth since we have the secret (matches user's simple-setup preference)
-            const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
-
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    tag: 'featured',
-                    public_ids: [publicId],
-                    command: isFeatured ? 'add' : 'remove'
-                })
-            });
-
-            if (!resp.ok) {
-                const err = await resp.json();
-                throw new Error(err.error?.message || 'Failed to update');
-            }
-
-            console.log(isFeatured ? 'Removed from Featured (Cloud)!' : 'Added to Featured (Cloud)!');
-        } catch (error) {
-            console.error('Toggle error:', error);
-            alert('Toggle failed: ' + error.message);
-            // Re-render only on failure to restore correct state
-            renderGallery();
         }
     }
 }
