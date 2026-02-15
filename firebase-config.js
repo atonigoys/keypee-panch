@@ -6,13 +6,13 @@ import { getStorage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-s
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyDmbvH3x89JLk-uj_QoyuwVLXMQ3EGImao",
-    authDomain: "keypeepanch-786b9.firebaseapp.com",
-    projectId: "keypeepanch-786b9",
-    storageBucket: "keypeepanch-786b9.firebasestorage.app",
-    messagingSenderId: "886539726415",
-    appId: "1:886539726415:web:ececfb8f4efe7f3925443a",
-    measurementId: "G-GXMPB8NBQB"
+    apiKey: "AIzaSyA0CJpzYSze5uTImSVx45ottpN4GChKr54",
+    authDomain: "keypeepanch-new.firebaseapp.com",
+    projectId: "keypeepanch-new",
+    storageBucket: "keypeepanch-new.firebasestorage.app",
+    messagingSenderId: "382916575120",
+    appId: "1:382916575120:web:44dbf935fb034d4cb9fd15",
+    measurementId: "G-569SX69JH9"
 };
 
 // Initialize Firebase

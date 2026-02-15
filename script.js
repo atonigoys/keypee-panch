@@ -1,4 +1,4 @@
-import { auth, db } from "./firebase-config.js";
+import { auth, db } from "./firebase-config.js?v=new";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -234,8 +234,8 @@ if (uploadForm) {
 }
 
 // --- REST API HELPERS (Bypass Firewall) ---
-const PROJECT_ID = "keypeepanch-786b9";
-const API_KEY = "AIzaSyDmbvH3x89JLk-uj_QoyuwVLXMQ3EGImao"; // Required for REST API Quota/Auth
+const PROJECT_ID = "keypeepanch-new";
+const API_KEY = "AIzaSyA0CJpzYSze5uTImSVx45ottpN4GChKr54"; // New project API key
 const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents`;
 
 async function getAuthHeaders() {
