@@ -136,7 +136,7 @@ function compressImage(file, maxWidth, quality, statusCallback) {
     });
 }
 
-// 3. Admin: Upload Image (Compressed Base64 to Firestore)
+// 3. Admin: Upload Image (Cloudinary + Firestore)
 if (uploadForm) {
     uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -149,27 +149,32 @@ if (uploadForm) {
         if (!file) return;
 
         submitBtn.disabled = true;
+        submitBtn.innerText = "Uploading to Cloudinary...";
 
         try {
-            // Updated to provide feedback
-            const base64String = await compressImage(file, 600, 0.6, (status) => {
-                submitBtn.innerText = status;
+            // 1. Upload to Cloudinary
+            const CLOUD_NAME = "dabwa174p";
+            const UPLOAD_PRESET = "Keypeepanch"; // Unsigned preset
+
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", UPLOAD_PRESET);
+
+            const cloudinaryResp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+                method: "POST",
+                body: formData
             });
 
-            submitBtn.innerText = "Uploading to Cloud...";
-
-            // Debug: Check size
-            const sizeInBytes = new Blob([base64String]).size;
-            const sizeInKB = (sizeInBytes / 1024).toFixed(2);
-            console.log(`Payload size: ${sizeInKB} KB`);
-
-            if (sizeInBytes > 1000000) { // 1MB limit check
-                throw new Error(`Image is too large (${sizeInKB} KB). Max is 1MB.`);
+            if (!cloudinaryResp.ok) {
+                throw new Error("Cloudinary Upload Failed");
             }
 
-            // Timeout Helper
-            const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out")), ms));
+            const cloudinaryData = await cloudinaryResp.json();
+            const imageUrl = cloudinaryData.secure_url;
 
+            submitBtn.innerText = "Saving to Database...";
+
+            // 2. Save Metadata to Firestore
             // REST API Fallback (Bypasses Firewall/SDK issues)
             const uploadToFirestoreRest = async () => {
                 const user = auth.currentUser;
@@ -188,7 +193,7 @@ if (uploadForm) {
                         fields: {
                             category: { stringValue: category },
                             color: { stringValue: color },
-                            image: { stringValue: base64String },
+                            image: { stringValue: imageUrl }, // Storing URL instead of Base64
                             isFeatured: { booleanValue: isFeatured },
                             createdAt: { stringValue: new Date().toISOString() }
                         }
@@ -204,19 +209,20 @@ if (uploadForm) {
             };
 
             // Race REST API against 15s timeout
+            const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out")), ms));
             await Promise.race([
                 uploadToFirestoreRest(),
                 timeout(15000)
             ]);
 
-            alert(`Upload Successful! (${sizeInKB} KB)`);
+            alert(`Upload Successful! Image hosted on Cloudinary.`);
             uploadForm.reset();
             invalidateCache(); // Clear cache on new upload
             renderGallery();
         } catch (error) {
             console.error("Upload error:", error);
             if (error.message === "Request timed out") {
-                alert("Upload timed out (15s). \nStealth Mode failed. Internet is very restricted.");
+                alert("Upload timed out (15s). \nCheck your internet connection.");
             } else {
                 alert("Upload failed: " + error.message);
             }
