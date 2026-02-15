@@ -158,7 +158,9 @@ if (uploadForm) {
                     context: { custom: { category, color, featured: String(isFeatured) } },
                     created_at: cloudData.created_at
                 };
-                addGalleryCard(newImg, true); // prepend
+                allResources.unshift(newImg); // Add to in-memory list
+                saveGalleryCache();
+                addGalleryCard(newImg, true); // prepend to DOM
             }
 
         } catch (error) {
@@ -176,16 +178,42 @@ if (uploadForm) {
 // =============================================
 let allResources = []; // Store all images for filtering
 let currentFilter = 'all';
+const CACHE_KEY = 'kp_gallery_cache';
+
+// Save gallery to localStorage
+function saveGalleryCache() {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(allResources));
+    } catch (e) { /* ignore quota errors */ }
+}
+
+// Load gallery from localStorage (instant!)
+function loadGalleryCache() {
+    try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        return cached ? JSON.parse(cached) : null;
+    } catch (e) { return null; }
+}
 
 async function renderGallery() {
     if (!gallery) return;
-    gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
 
+    // Step 1: Show cached data INSTANTLY
+    const cached = loadGalleryCache();
+    if (cached && cached.length > 0) {
+        allResources = cached;
+        applyGalleryFilter();
+    } else {
+        gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
+    }
+
+    // Step 2: Background sync from Cloudinary (updates silently)
     try {
         const resp = await fetch(`${CLOUDINARY_LIST_URL}/all.json`);
         if (!resp.ok) {
             if (resp.status === 404) {
                 allResources = [];
+                saveGalleryCache();
                 applyGalleryFilter();
                 return;
             }
@@ -194,17 +222,19 @@ async function renderGallery() {
 
         const data = await resp.json();
         allResources = data.resources || [];
-
-        // Sort by created_at descending (newest first)
         allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
+        saveGalleryCache();
         applyGalleryFilter();
 
     } catch (error) {
-        console.error("Gallery error:", error);
-        gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
+        console.error("Gallery sync error:", error);
+        // If we have cached data, keep showing it
+        if (!cached || cached.length === 0) {
+            gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
+        }
     }
 }
+
 
 function applyGalleryFilter() {
     if (!gallery) return;
@@ -299,7 +329,9 @@ function addGalleryCard(img, prepend) {
 async function deleteImage(publicId) {
     if (!confirm(`Delete this image?\nThis cannot be undone.`)) return;
 
-    // Instantly remove from DOM
+    // Instantly remove from DOM + cache
+    allResources = allResources.filter(r => r.public_id !== publicId);
+    saveGalleryCache();
     const card = gallery?.querySelector(`[data-public-id="${publicId}"]`);
     if (card) card.remove();
     if (gallery && gallery.children.length === 0) {
@@ -345,19 +377,27 @@ async function toggleFeatured(publicId, currentTags) {
     }
     const tagsString = newTags.join(',');
 
-    // Instantly update the card in DOM
+    // Instantly update the card in DOM + cache
+    const resIdx = allResources.findIndex(r => r.public_id === publicId);
+    if (resIdx !== -1) {
+        allResources[resIdx] = { ...allResources[resIdx], tags: newTags };
+        saveGalleryCache();
+    }
+
     const card = gallery?.querySelector(`[data-public-id="${publicId}"]`);
     if (card) {
-        const newImg = {
+        const newImg = allResources[resIdx] || {
             public_id: publicId,
             tags: newTags,
             context: { custom: {} }
         };
-        // Copy existing context from card text
-        const catEl = card.querySelector('p:first-child');
-        const colorEl = card.querySelector('p:nth-child(2)');
-        if (catEl) newImg.context.custom.category = catEl.textContent;
-        if (colorEl) newImg.context.custom.color = colorEl.textContent;
+        // Copy existing context from card text if not in allResources
+        if (!newImg.context?.custom?.category) {
+            const catEl = card.querySelector('p:first-child');
+            const colorEl = card.querySelector('p:nth-child(2)');
+            if (catEl) newImg.context = { custom: { ...(newImg.context?.custom || {}), category: catEl.textContent } };
+            if (colorEl) newImg.context.custom.color = colorEl.textContent;
+        }
 
         const parent = card.parentNode;
         const next = card.nextSibling;
