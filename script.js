@@ -392,17 +392,17 @@ function addGalleryCard(img, prepend) {
 
     const el = document.createElement('div');
     el.dataset.publicId = img.public_id;
-    el.style.cssText = `position: relative; border: ${isFeatured ? '2px solid gold' : '1px solid var(--color-text-secondary)'}; border-radius: 8px; overflow: hidden; ${isFeatured ? 'box-shadow: 0 0 10px rgba(255,215,0,0.35);' : ''}`;
+    el.style.cssText = `position: relative; border: ${isFeatured ? '2px solid #ff69b4' : '1px solid var(--color-text-secondary)'}; border-radius: 8px; overflow: hidden; ${isFeatured ? 'box-shadow: 0 0 12px rgba(255,105,180,0.45);' : ''}`;
     el.innerHTML = `
         <img src="${imageUrl}" alt="${category}" style="width: 100%; height: 150px; object-fit: cover; display: block;">
         <div style="padding: 0.5rem;">
             <p style="margin: 0; font-weight: bold; font-size: 0.85rem;">${category}</p>
             <p style="margin: 0; font-size: 0.75rem; color: var(--color-text-secondary);">${color}</p>
-            ${isFeatured ? '<span style="font-size: 0.7rem; color: gold;">⭐ Featured</span>' : '<span style="font-size: 0.7rem; color: var(--color-text-secondary);">Not Featured</span>'}
+            ${isFeatured ? '<span style="font-size: 0.7rem; color: #ff69b4;">⭐ Featured</span>' : '<span style="font-size: 0.7rem; color: var(--color-text-secondary);">Not Featured</span>'}
         </div>
         <div style="display: flex; gap: 0.25rem; padding: 0 0.5rem 0.5rem;">
             <button class="toggle-btn"
-                style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid ${isFeatured ? '#ff4444' : 'gold'}; background: ${isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)'}; color: ${isFeatured ? '#ff4444' : 'gold'}; border-radius: 4px;">
+                style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid ${isFeatured ? '#ff4444' : '#ff69b4'}; background: ${isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,105,180,0.2)'}; color: ${isFeatured ? '#ff4444' : '#ff69b4'}; border-radius: 4px;">
                 ${isFeatured ? '★ Unfeature' : '☆ Feature'}
             </button>
             <button class="delete-btn"
@@ -548,14 +548,14 @@ async function toggleFeatured(publicId, currentTags) {
         const card = gallery?.querySelector(`[data-public-id="${publicId}"]`);
         if (card) {
             // Update styling
-            card.style.border = isFeatured ? '2px solid gold' : '1px solid var(--color-text-secondary)';
-            card.style.boxShadow = isFeatured ? '0 0 10px rgba(255,215,0,0.35)' : 'none';
+            card.style.border = isFeatured ? '2px solid #ff69b4' : '1px solid var(--color-text-secondary)';
+            card.style.boxShadow = isFeatured ? '0 0 12px rgba(255,105,180,0.45)' : 'none';
 
             // Update label
             const statusSpan = card.querySelector('div span');
             if (statusSpan) {
                 statusSpan.innerHTML = isFeatured
-                    ? '<span style="color: gold;">⭐ Featured</span>'
+                    ? '<span style="color: #ff69b4;">⭐ Featured</span>'
                     : '<span style="color: var(--color-text-secondary);">Not Featured</span>';
             }
 
@@ -563,9 +563,9 @@ async function toggleFeatured(publicId, currentTags) {
             const toggleBtn = card.querySelector('.toggle-btn');
             if (toggleBtn) {
                 toggleBtn.innerHTML = isFeatured ? '★ Unfeature' : '☆ Feature';
-                toggleBtn.style.borderColor = isFeatured ? '#ff4444' : 'gold';
-                toggleBtn.style.color = isFeatured ? '#ff4444' : 'gold';
-                toggleBtn.style.background = isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)';
+                toggleBtn.style.borderColor = isFeatured ? '#ff4444' : '#ff69b4';
+                toggleBtn.style.color = isFeatured ? '#ff4444' : '#ff69b4';
+                toggleBtn.style.background = isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,105,180,0.2)';
 
                 // Call Cloudinary Upload API ('explicit' method) to update Context AND Tags
                 // This ensures public site (which relies on Tags) works automatically
