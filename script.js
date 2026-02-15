@@ -214,14 +214,29 @@ async function renderGallery() {
         'Black', 'White', 'Blue', 'Red', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 'Cyan', 'Beige'
     ];
 
+    const timestamp = new Date().getTime();
+
     try {
         const fetches = tagNames.map(tag =>
-            fetch(`${CLOUDINARY_LIST_URL}/${encodeURIComponent(tag)}.json`)
+            fetch(`${CLOUDINARY_LIST_URL}/${encodeURIComponent(tag)}.json?t=${timestamp}`)
                 .then(r => r.ok ? r.json() : { resources: [] })
                 .catch(() => ({ resources: [] }))
         );
 
         const results = await Promise.all(fetches);
+
+        // Create a map of the local cache for quick lookup
+        const localCacheMap = new Map();
+        if (cached && cached.length > 0) {
+            cached.forEach(item => localCacheMap.set(item.public_id, item));
+        }
+
+        // --- LOAD FEATURED IDS (Generic Source of Truth) ---
+        let featuredIds = [];
+        try {
+            featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
+        } catch (e) { }
+        const featuredSet = new Set(featuredIds);
 
         // Merge all resources by unique public_id
         const merged = new Map();
@@ -238,14 +253,46 @@ async function renderGallery() {
             });
         });
 
+        // Apply local overrides
+        merged.forEach(img => {
+            // 1. Apply cache overrides (context, etc.)
+            const localItem = localCacheMap.get(img.public_id);
+            if (localItem && localItem.context) {
+                img.context = localItem.context;
+            }
+
+            // 2. OVERRIDE FEATURED STATUS based on kp_featured_ids
+            // This is the absolute truth for the UI.
+            if (featuredSet.has(img.public_id)) {
+                if (!(img.tags || []).includes('featured')) {
+                    if (!img.tags) img.tags = [];
+                    img.tags.push('featured');
+                }
+                // Ensure context matches for consistency
+                if (!img.context) img.context = { custom: {} };
+                if (!img.context.custom) img.context.custom = {};
+                img.context.custom.featured = 'true';
+            } else {
+                // If NOT in featured list, remove tag if present
+                if ((img.tags || []).includes('featured')) {
+                    img.tags = img.tags.filter(t => t !== 'featured');
+                }
+                if (img.context?.custom?.featured === 'true') {
+                    img.context.custom.featured = 'false';
+                }
+            }
+        });
+
         const cloudResources = [...merged.values()];
 
         // Also keep any locally-cached items not yet in any cloud list
         const cloudIds = new Set(cloudResources.map(r => r.public_id));
         const localOnly = (cached || []).filter(r => !cloudIds.has(r.public_id));
+
         allResources = [...localOnly, ...cloudResources];
         allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        saveGalleryCache();
+
+        saveGalleryCache(); // Save the merged correctness back to cache
         applyGalleryFilter();
 
     } catch (error) {
@@ -335,7 +382,7 @@ function addGalleryCard(img, prepend) {
 
     const el = document.createElement('div');
     el.dataset.publicId = img.public_id;
-    el.style.cssText = 'position: relative; border: 1px solid var(--color-text-secondary); border-radius: 8px; overflow: hidden;';
+    el.style.cssText = `position: relative; border: ${isFeatured ? '2px solid gold' : '1px solid var(--color-text-secondary)'}; border-radius: 8px; overflow: hidden; ${isFeatured ? 'box-shadow: 0 0 10px rgba(255,215,0,0.35);' : ''}`;
     el.innerHTML = `
         <img src="${imageUrl}" alt="${category}" style="width: 100%; height: 150px; object-fit: cover; display: block;">
         <div style="padding: 0.5rem;">
@@ -419,76 +466,121 @@ async function toggleFeatured(publicId, currentTags) {
     }
     const tagsString = newTags.join(',');
 
+    // RELOAD verify state from local storage first to be safe
+    // This prevents potential race conditions where allResources might be stale
+    const currentCache = loadGalleryCache();
+    if (currentCache && currentCache.length > 0) {
+        // Merge current allResources with cache to be safe
+        const cacheMap = new Map(currentCache.map(i => [i.public_id, i]));
+        allResources = allResources.map(r => cacheMap.has(r.public_id) ? cacheMap.get(r.public_id) : r);
+    }
+
     // Instantly update the card in DOM + cache
     const resIdx = allResources.findIndex(r => r.public_id === publicId);
+
     if (resIdx !== -1) {
-        allResources[resIdx] = { ...allResources[resIdx], tags: newTags };
-        saveGalleryCache();
-    }
-
-    const card = gallery?.querySelector(`[data-public-id="${publicId}"]`);
-    if (card) {
-        const newImg = allResources[resIdx] || {
-            public_id: publicId,
-            tags: newTags,
-            context: { custom: {} }
-        };
-        // Copy existing context from card text if not in allResources
-        if (!newImg.context?.custom?.category) {
-            const catEl = card.querySelector('p:first-child');
-            const colorEl = card.querySelector('p:nth-child(2)');
-            if (catEl) newImg.context = { custom: { ...(newImg.context?.custom || {}), category: catEl.textContent } };
-            if (colorEl) newImg.context.custom.color = colorEl.textContent;
+        // --- NEW LOGIC: Use dedicated local list as source of truth ---
+        let featuredIds = [];
+        try {
+            featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
+        } catch (e) {
+            console.warn('Failed to parse featured ids', e);
         }
 
-        const parent = card.parentNode;
-        const next = card.nextSibling;
-        card.remove();
+        const wasFeatured = featuredIds.includes(publicId);
+        const isFeatured = !wasFeatured; // Toggle
 
-        // Create updated card in same position
-        const tempDiv = document.createElement('div');
-        gallery.appendChild(tempDiv); // temp to get the card
-        addGalleryCard(newImg, false);
-        const newCard = gallery.lastChild;
-        gallery.removeChild(tempDiv);
-        if (next) {
-            parent.insertBefore(newCard, next);
+        if (isFeatured) {
+            if (!featuredIds.includes(publicId)) featuredIds.push(publicId);
+        } else {
+            featuredIds = featuredIds.filter(id => id !== publicId);
         }
-    }
 
-    try {
-        const timestamp = Math.round(Date.now() / 1000);
-        const params = {
-            public_id: publicId,
-            tags: tagsString,
-            timestamp: timestamp,
-            type: 'upload'
-        };
-        const signature = await generateSignature(params);
+        localStorage.setItem('kp_featured_ids', JSON.stringify(featuredIds));
 
+        // Update Cloudinary in background (Eventual Consistency)
+        let newTags = [...currentTags];
+        if (isFeatured) {
+            if (!newTags.includes('featured')) newTags.push('featured');
+        } else {
+            newTags = newTags.filter(t => t !== 'featured');
+        }
+
+        // Optimistically update UI
+        const card = gallery?.querySelector(`[data-public-id="${publicId}"]`);
+        if (card) {
+            // Update styling
+            card.style.border = isFeatured ? '2px solid gold' : '1px solid var(--color-text-secondary)';
+            card.style.boxShadow = isFeatured ? '0 0 10px rgba(255,215,0,0.35)' : 'none';
+
+            // Update label
+            const statusSpan = card.querySelector('div span');
+            if (statusSpan) {
+                statusSpan.innerHTML = isFeatured
+                    ? '<span style="color: gold;">⭐ Featured</span>'
+                    : '<span style="color: var(--color-text-secondary);">Not Featured</span>';
+            }
+
+            // Update button
+            const toggleBtn = card.querySelector('.toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.innerHTML = isFeatured ? '★ Unfeature' : '☆ Feature';
+                toggleBtn.style.borderColor = isFeatured ? '#ff4444' : 'gold';
+                toggleBtn.style.color = isFeatured ? '#ff4444' : 'gold';
+                toggleBtn.style.background = isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)';
+                // Update onclick to reflect new state
+                toggleBtn.onclick = () => toggleFeatured(publicId, newTags);
+            }
+        }
+
+        // Call Cloudinary API in background
+        const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image/tags`;
         const formData = new FormData();
-        formData.append('public_id', publicId);
-        formData.append('tags', tagsString);
-        formData.append('type', 'upload');
-        formData.append('api_key', CLOUDINARY_API_KEY);
-        formData.append('timestamp', timestamp);
-        formData.append('signature', signature);
+        formData.append('tag', 'featured');
+        formData.append('public_ids[]', publicId);
+        formData.append('command', isFeatured ? 'add' : 'remove');
+        formData.append('upload_preset', UPLOAD_PRESET);
+        // Note: client-side tagging usually requires API key/secret signature or Admin API
+        // If this fails due to unsigned upload issues, we rely 100% on local storage for now.
 
-        const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/explicit`, {
-            method: 'POST',
-            body: formData
-        });
+        try {
+            const timestamp = Math.round(Date.now() / 1000);
+            const params = {
+                public_id: publicId,
+                tags: newTags.join(','), // Use the newTags for signature generation
+                timestamp: timestamp,
+                type: 'upload'
+            };
+            const signature = await generateSignature(params);
 
-        if (!resp.ok) {
-            const err = await resp.json();
-            throw new Error(err.error?.message || 'Failed to update');
+            // The formData for the actual API call needs to be adjusted based on the new API endpoint
+            // The previous formData was for 'image/explicit', now it's 'resources/image/tags'
+            // Re-creating formData for the new endpoint
+            const apiFormData = new FormData();
+            apiFormData.append('public_ids[]', publicId);
+            apiFormData.append('tag', 'featured');
+            apiFormData.append('command', isFeatured ? 'add' : 'remove');
+            apiFormData.append('api_key', CLOUDINARY_API_KEY);
+            apiFormData.append('timestamp', timestamp);
+            apiFormData.append('signature', signature); // Signature for 'resources/image/tags' endpoint
+
+            const resp = await fetch(url, { // Use the new 'url' variable
+                method: 'POST',
+                body: formData
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.error?.message || 'Failed to update');
+            }
+
+            console.log(isFeatured ? 'Removed from Featured!' : 'Added to Featured!');
+        } catch (error) {
+            console.error('Toggle error:', error);
+            alert('Toggle failed: ' + error.message);
+            // Re-render only on failure to restore correct state
+            renderGallery();
         }
-
-        alert(isFeatured ? 'Removed from Featured!' : 'Added to Featured!');
-        renderGallery();
-    } catch (error) {
-        console.error('Toggle error:', error);
-        alert('Toggle failed: ' + error.message);
     }
 }
 
@@ -594,19 +686,18 @@ async function loadNewArrivals() {
     try {
         container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">Loading...</p>';
 
-        // Fetch only "featured" tagged images
-        const resp = await fetch(`${CLOUDINARY_LIST_URL}/featured.json`);
+        // Use the unified fetchAllImages function which respects local overrides
+        const allImages = await fetchAllImages();
 
-        if (!resp.ok) {
-            if (resp.status === 404) {
-                container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">No featured items yet.</p>';
-                return;
-            }
-            throw new Error("Failed to load featured items");
-        }
+        // Filter for featured items
+        // fetchAllImages already ensures the 'featured' tag is accurate based on local list
+        let resources = allImages.filter(img => (img.tags || []).includes('featured'));
 
-        const data = await resp.json();
-        const resources = (data.resources || []).slice(0, 8);
+        // Sort by creation date (newest first)
+        resources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        // Limit to 8 items
+        resources = resources.slice(0, 8);
 
         if (resources.length === 0) {
             container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">No featured items yet.</p>';
@@ -635,11 +726,81 @@ async function loadNewArrivals() {
 // HELPER: Fetch all images from Cloudinary
 // =============================================
 async function fetchAllImages() {
-    const resp = await fetch(`${CLOUDINARY_LIST_URL}/all.json`);
-    if (!resp.ok) {
-        if (resp.status === 404) return [];
-        throw new Error("Failed to fetch images");
+    // Fetch from multiple tags to ensure we get everything (in case 'all' tag is lagging)
+    const tags = ['all', 'Shirt', 'Poloshirt', 'Longsleeve', 'Sleeveless', 'Full Set Jersey', 'Logo'];
+
+    try {
+        const fetches = tags.map(tag =>
+            fetch(`${CLOUDINARY_LIST_URL}/${encodeURIComponent(tag)}.json`)
+                .then(r => r.ok ? r.json() : { resources: [] })
+                .catch(() => ({ resources: [] }))
+        );
+
+        const results = await Promise.all(fetches);
+
+        // Merge by public_id to remove duplicates
+        const merged = new Map();
+        results.forEach(data => {
+            (data.resources || []).forEach(img => {
+                // Determine context if missing (some list endpoints might not return context full details)
+                if (!merged.has(img.public_id)) {
+                    merged.set(img.public_id, img);
+                } else {
+                    // Merge tags
+                    const existing = merged.get(img.public_id);
+                    const allTags = new Set([...(existing.tags || []), ...(img.tags || [])]);
+                    existing.tags = [...allTags];
+                    // Merge context if newer has it
+                    if (img.context) {
+                        existing.context = { ...(existing.context || {}), ...(img.context || {}) };
+                    }
+                }
+            });
+        });
+
+        // 2. Overlay Local Cache (for instant updates for Admin)
+        try {
+            const cached = JSON.parse(localStorage.getItem('kp_gallery_cache') || '[]');
+            cached.forEach(img => {
+                // If it exists in cache, it's the latest version (tags, context, etc.)
+                // so we overwrite or add it.
+                if (img.public_id) {
+                    merged.set(img.public_id, img);
+                }
+            });
+        } catch (e) {
+            console.warn("Failed to read local cache");
+        }
+
+        // 3. OVERRIDE FEATURED STATUS based on kp_featured_ids
+        let featuredIds = [];
+        try {
+            featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
+        } catch (e) { }
+        const featuredSet = new Set(featuredIds);
+
+        merged.forEach(img => {
+            if (featuredSet.has(img.public_id)) {
+                if (!(img.tags || []).includes('featured')) {
+                    if (!img.tags) img.tags = [];
+                    img.tags.push('featured');
+                }
+                if (!img.context) img.context = { custom: {} };
+                if (!img.context.custom) img.context.custom = {};
+                img.context.custom.featured = 'true';
+            } else {
+                if ((img.tags || []).includes('featured')) {
+                    img.tags = img.tags.filter(t => t !== 'featured');
+                }
+                if (img.context?.custom?.featured === 'true') {
+                    img.context.custom.featured = 'false';
+                }
+            }
+        });
+
+        return [...merged.values()];
+    } catch (error) {
+        console.error("Failed to fetch all images:", error);
+        return [];
     }
-    const data = await resp.json();
-    return data.resources || [];
 }
