@@ -21,12 +21,12 @@ setPersistence(auth, browserSessionPersistence)
             updateNavigation(user);
 
             // Protect Admin Page
-            if (window.location.pathname.includes('admin.html') && !user) {
-                window.location.href = 'login.html';
+            if (window.location.pathname.includes('/admin') && !user) {
+                window.location.href = '../login.html';
             }
 
             // Admin Page Logic on Load
-            if (window.location.pathname.includes('admin.html') && user) {
+            if (window.location.pathname.includes('/admin') && user) {
                 const wrapper = document.getElementById('admin-page-wrapper');
                 if (wrapper) wrapper.style.display = 'block';
 
@@ -50,7 +50,9 @@ function updateNavigation(user) {
         // Dashboard Link
         const dashboardLi = document.createElement('li');
         dashboardLi.id = 'dashboard-link';
-        dashboardLi.innerHTML = `<a href="admin.html" class="${window.location.pathname.includes('admin.html') ? 'active' : ''}">Dashboard</a>`;
+        const isAdmin = window.location.pathname.includes('/admin');
+        const dashPath = isAdmin ? '#' : 'admin/';
+        dashboardLi.innerHTML = `<a href="${dashPath}" class="${isAdmin ? 'active' : ''}">Dashboard</a>`;
         navList.appendChild(dashboardLi);
 
         // Logout Link
@@ -63,7 +65,8 @@ function updateNavigation(user) {
             e.preventDefault();
             if (!confirm("Are you sure you want to log out?")) return;
             signOut(auth).then(() => {
-                window.location.href = 'index.html';
+                const isAdmin = window.location.pathname.includes('/admin');
+                window.location.href = isAdmin ? '../index.html' : 'index.html';
             }).catch((error) => {
                 console.error("Logout error", error);
             });
@@ -86,7 +89,7 @@ if (loginForm) {
         try {
             await setPersistence(auth, browserSessionPersistence);
             await signInWithEmailAndPassword(auth, email, password);
-            window.location.href = 'admin.html';
+            window.location.href = 'admin/';
         } catch (error) {
             console.error(error);
             errorMsg.innerText = "Invalid username or password";
