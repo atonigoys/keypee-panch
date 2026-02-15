@@ -27,9 +27,6 @@
         <main id="admin-content">
             <div class="container">
                 <h1>Admin Dashboard</h1>
-                <!-- Description Removed -->
-
-                <!-- Stats Removed -->
 
                 <!-- Upload Section -->
                 <div class="upload-container">
@@ -83,22 +80,15 @@
                 <h2 style="margin-bottom: 1.5rem;">Recent Uploads</h2>
                 <div id="upload-gallery"
                     style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 4rem;">
-                    <!-- Gallery items will be injected here by JS -->
                     <p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">No images
-                        uploaded
-                        yet.</p>
+                        uploaded yet.</p>
                 </div>
 
-                <!-- Danger Zone -->
-                <div style="margin-top: 4rem; padding-top: 2rem; border-top: 1px solid #eee;">
-                    <h2 style="color: red; margin-bottom: 1rem;">Danger Zone</h2>
-                    <p style="margin-bottom: 1rem; color: var(--color-text-secondary);">This action is irreversible. It
-                        will delete all products from the database.</p>
-                    <button type="button" id="reset-database-btn" class="btn"
-                        style="background-color: red; border: none;">Reset Database</button>
-                </div>
-
-                <!-- Recent Orders Removed -->
+                <p style="color: var(--color-text-secondary); font-size: 0.85rem; margin-bottom: 2rem;">
+                    💡 To delete images, visit your <a href="https://console.cloudinary.com/" target="_blank"
+                        style="color: var(--color-text-primary);">Cloudinary Console</a>.
+                    Note: Gallery updates may take up to 60 seconds after uploading.
+                </p>
             </div>
         </main>
 
@@ -107,7 +97,7 @@
         </footer>
     </div>
 
-    <script type="module" src="../script.js?v=4"></script>
+    <script src="../script.js?v=6"></script>
 </body>
 
 </html>

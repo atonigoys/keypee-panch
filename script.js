@@ -1,58 +1,54 @@
-import { auth, db } from "./firebase-config.js?v=new";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+// =============================================
+// KEYPEE PANCH — Cloudinary-Only Script
+// No Firestore. No Firebase. Just Cloudinary.
+// =============================================
 
-// DOM Elements
-const navList = document.querySelector('nav ul');
+const CLOUD_NAME = "dabwa174p";
+const UPLOAD_PRESET = "Keypeepanch"; // Unsigned preset
+const CLOUDINARY_LIST_URL = `https://res.cloudinary.com/${CLOUD_NAME}/image/list`;
+const ADMIN_PASSWORD = "admin123"; // Change this to your preferred password
+
+// --- DOM Elements ---
 const loginForm = document.getElementById('login-form');
 const uploadForm = document.getElementById('upload-form');
-const applyFiltersBtn = document.getElementById('apply-filters');
-const recentOrdersTable = document.querySelector('table tbody');
 const gallery = document.getElementById('upload-gallery');
+const applyFiltersBtn = document.getElementById('apply-filters');
 
-// 0. Enforce Session Persistence Globally
-// This ensures that even if you had a 'Remember Me' session from before, it's converted to Session Only (clears on close)
-setPersistence(auth, browserSessionPersistence)
-    .then(() => {
-        console.log("Persistence set to SESSION");
+// =============================================
+// 1. SIMPLE AUTH (No Firebase)
+// =============================================
+const isAdminPage = window.location.pathname.includes('/admin');
 
-        // 1. Authentication State Observer (Only attach after persistence is set)
-        onAuthStateChanged(auth, (user) => {
-            updateNavigation(user);
+// Check if logged in
+function isLoggedIn() {
+    return sessionStorage.getItem('kp_admin') === 'true';
+}
 
-            // Protect Admin Page
-            if (window.location.pathname.includes('/admin') && !user) {
-                window.location.href = '../login.html';
-            }
+// Protect admin page
+if (isAdminPage && !isLoggedIn()) {
+    window.location.href = '../login.html';
+}
 
-            // Admin Page Logic on Load
-            if (window.location.pathname.includes('/admin') && user) {
-                const wrapper = document.getElementById('admin-page-wrapper');
-                if (wrapper) wrapper.style.display = 'block';
+// Show admin content if logged in
+if (isAdminPage && isLoggedIn()) {
+    const wrapper = document.getElementById('admin-page-wrapper');
+    if (wrapper) wrapper.style.display = 'block';
+    renderGallery();
+}
 
-                renderGallery();
-                renderStats(); // Simulated for now
-            }
-        });
-    })
-    .catch((error) => console.error("Persistence error", error));
+// Update navigation
+updateNavigation();
 
-function updateNavigation(user) {
+function updateNavigation() {
+    const navList = document.querySelector('nav ul');
     if (!navList) return;
 
-    // Remove existing auth links
-    const existingAuthLink = document.getElementById('auth-link');
-    if (existingAuthLink) existingAuthLink.remove();
-    const existingDashboardLink = document.getElementById('dashboard-link');
-    if (existingDashboardLink) existingDashboardLink.remove();
-
-    if (user) {
+    if (isLoggedIn()) {
         // Dashboard Link
         const dashboardLi = document.createElement('li');
         dashboardLi.id = 'dashboard-link';
-        const isAdmin = window.location.pathname.includes('/admin');
-        const dashPath = isAdmin ? '#' : 'admin/';
-        dashboardLi.innerHTML = `<a href="${dashPath}" class="${isAdmin ? 'active' : ''}">Dashboard</a>`;
+        const dashPath = isAdminPage ? '#' : 'admin/';
+        dashboardLi.innerHTML = `<a href="${dashPath}" class="${isAdminPage ? 'active' : ''}">Dashboard</a>`;
         navList.appendChild(dashboardLi);
 
         // Logout Link
@@ -64,420 +60,147 @@ function updateNavigation(user) {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (!confirm("Are you sure you want to log out?")) return;
-            signOut(auth).then(() => {
-                const isAdmin = window.location.pathname.includes('/admin');
-                window.location.href = isAdmin ? '../index.html' : 'index.html';
-            }).catch((error) => {
-                console.error("Logout error", error);
-            });
+            sessionStorage.removeItem('kp_admin');
+            window.location.href = isAdminPage ? '../index.html' : 'index.html';
         });
         logoutLi.appendChild(logoutBtn);
         navList.appendChild(logoutLi);
-    } else {
-        // Login Link hidden as per user request (access via /admin.html)
     }
 }
 
-// 2. Handle Login
+// Handle Login
 if (loginForm) {
-    loginForm.addEventListener('submit', async (e) => {
+    loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        const email = loginForm.username.value; // Using username input as email for simplicity
         const password = loginForm.password.value;
         const errorMsg = document.getElementById('error-msg');
 
-        try {
-            await setPersistence(auth, browserSessionPersistence);
-            await signInWithEmailAndPassword(auth, email, password);
+        if (password === ADMIN_PASSWORD) {
+            sessionStorage.setItem('kp_admin', 'true');
             window.location.href = 'admin/';
-        } catch (error) {
-            console.error(error);
-            errorMsg.innerText = "Invalid username or password";
+        } else {
+            errorMsg.innerText = "Invalid password";
             errorMsg.style.display = 'block';
         }
     });
 }
 
-// 3. Admin: Upload Image (Base64 to Firestore)
-// Helper: Compress Image
-function compressImage(file, maxWidth, quality, statusCallback) {
-    return new Promise((resolve, reject) => {
-        if (statusCallback) statusCallback("Reading File...");
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = event => {
-            if (statusCallback) statusCallback("Loading Image...");
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                if (statusCallback) statusCallback("Compressing...");
-                try {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > maxWidth) {
-                        height *= maxWidth / width;
-                        width = maxWidth;
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', quality));
-                } catch (e) {
-                    reject(e);
-                }
-            };
-            img.onerror = error => reject(new Error("Failed to load image"));
-        };
-        reader.onerror = error => reject(new Error("Failed to read file"));
-    });
-}
-
-// 3. Admin: Upload Image (Cloudinary + Firestore)
+// =============================================
+// 2. ADMIN: Upload to Cloudinary
+// =============================================
 if (uploadForm) {
     uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
         const category = document.getElementById('upload-category').value;
         const color = document.getElementById('upload-color').value;
-        const isFeatured = document.getElementById('upload-featured').checked;
         const file = document.getElementById('upload-file').files[0];
-        const submitBtn = uploadForm.querySelector('button');
+        const isFeatured = document.getElementById('upload-featured')?.checked || false;
+        const submitBtn = uploadForm.querySelector('button[type="submit"]');
 
-        if (!file) return;
+        if (!file) {
+            alert("Please select an image file.");
+            return;
+        }
 
         submitBtn.disabled = true;
-        submitBtn.innerText = "Uploading to Cloudinary...";
+        submitBtn.innerText = "Uploading...";
 
         try {
-            // 1. Upload to Cloudinary
-            const CLOUD_NAME = "dabwa174p";
-            const UPLOAD_PRESET = "Keypeepanch"; // Unsigned preset
-
             const formData = new FormData();
             formData.append("file", file);
             formData.append("upload_preset", UPLOAD_PRESET);
 
-            const cloudinaryResp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+            // Tags for filtering: "all" (everything), category, color, optionally "featured"
+            const tags = ["all", category, color];
+            if (isFeatured) tags.push("featured");
+            formData.append("tags", tags.join(","));
+
+            // Context metadata for display
+            formData.append("context", `category=${category}|color=${color}|featured=${isFeatured}`);
+
+            const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
                 method: "POST",
                 body: formData
             });
 
-            if (!cloudinaryResp.ok) {
-                throw new Error("Cloudinary Upload Failed");
+            if (!resp.ok) {
+                const errData = await resp.json();
+                throw new Error(errData.error?.message || "Upload failed");
             }
 
-            const cloudinaryData = await cloudinaryResp.json();
-            const imageUrl = cloudinaryData.secure_url;
-
-            submitBtn.innerText = "Saving to Database...";
-
-            // 2. Save Metadata to Firestore
-            // REST API Fallback (Bypasses Firewall/SDK issues)
-            const uploadToFirestoreRest = async () => {
-                const user = auth.currentUser;
-                if (!user) throw new Error("User not authenticated");
-
-                const token = await user.getIdToken();
-                const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents/products?key=${API_KEY}`;
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        fields: {
-                            category: { stringValue: category },
-                            color: { stringValue: color },
-                            image: { stringValue: imageUrl }, // Storing URL instead of Base64
-                            isFeatured: { booleanValue: isFeatured },
-                            createdAt: { stringValue: new Date().toISOString() }
-                        }
-                    })
-                });
-
-                if (!response.ok) {
-                    const err = await response.text();
-                    throw new Error(`REST API Error: ${response.status} ${err}`);
-                }
-
-                return await response.json();
-            };
-
-            // Race REST API against 15s timeout
-            const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out")), ms));
-            await Promise.race([
-                uploadToFirestoreRest(),
-                timeout(15000)
-            ]);
-
-            alert(`Upload Successful! Image hosted on Cloudinary.`);
+            alert("Upload Successful!");
             uploadForm.reset();
-            invalidateCache(); // Clear cache on new upload
             renderGallery();
+
         } catch (error) {
             console.error("Upload error:", error);
-            if (error.message === "Request timed out") {
-                alert("Upload timed out (15s). \nCheck your internet connection.");
-            } else {
-                alert("Upload failed: " + error.message);
-            }
+            alert("Upload failed: " + error.message);
         } finally {
-            submitBtn.innerText = "Upload Design";
             submitBtn.disabled = false;
+            submitBtn.innerText = "Upload Design";
         }
     });
 }
 
-// --- REST API HELPERS (Bypass Firewall) ---
-const PROJECT_ID = "keypeepanch-new";
-const API_KEY = "AIzaSyA0CJpzYSze5uTImSVx45ottpN4GChKr54"; // New project API key
-const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents`;
-
-async function getAuthHeaders() {
-    const user = auth.currentUser;
-    if (!user) {
-        console.warn("getAuthHeaders: No user logged in.");
-        return {};
-    }
-    console.log("getAuthHeaders: Getting token for user", user.email);
-    try {
-        const token = await user.getIdToken();
-        return { 'Authorization': `Bearer ${token}` };
-    } catch (e) {
-        console.error("getAuthHeaders Error:", e);
-        return {};
-    }
-}
-
-function parseFirestoreDoc(doc) {
-    const data = {};
-    if (doc.fields) {
-        for (const [key, value] of Object.entries(doc.fields)) {
-            // Simplify parsing for our specific string-heavy data
-            data[key] = value.stringValue || value.booleanValue || value.integerValue || value.timestampValue || "";
-        }
-    }
-    // Extract ID from full path "projects/.../documents/products/ID"
-    const id = doc.name.split('/').pop();
-    return { id, ...data };
-}
-
-const CACHE_KEY = 'products_cache';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-function getCachedProducts() {
-    const cached = sessionStorage.getItem(CACHE_KEY);
-    if (!cached) return null;
-
-    try {
-        const { timestamp, data } = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-            console.log("Serving from cache");
-            return data;
-        }
-    } catch (e) {
-        console.error("Cache parse error", e);
-    }
-    return null;
-}
-
-function setCachedProducts(data) {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
-        timestamp: Date.now(),
-        data: data
-    }));
-}
-
-function invalidateCache() {
-    sessionStorage.removeItem(CACHE_KEY);
-    console.log("Cache invalidated");
-}
-
-// Helper: Fetch products using POST-based :runQuery (bypasses GET firewall block)
-async function fetchProductsRunQuery() {
-    // Try cache first
-    const cached = getCachedProducts();
-    if (cached) return cached;
-
-    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents:runQuery`;
-    const headers = await getAuthHeaders();
-    headers['Content-Type'] = 'application/json';
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-            structuredQuery: {
-                from: [{ collectionId: "products" }]
-            }
-        })
-    });
-
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`API Error (${response.status}): ${errText}`);
-    }
-
-    const results = await response.json();
-    // runQuery returns [{document: {...}}, ...] - filter out empty results
-    const products = results
-        .filter(r => r.document)
-        .map(r => parseFirestoreDoc(r.document));
-
-    setCachedProducts(products); // Store in cache
-    return products;
-}
-
-// 4. Admin: Render Gallery (REST API via runQuery POST)
+// =============================================
+// 3. ADMIN: Render Gallery from Cloudinary
+// =============================================
 async function renderGallery() {
     if (!gallery) return;
-    gallery.innerHTML = '<p style="grid-column: 1/-1;">Loading images...</p>';
+    gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
 
     try {
-        const allDocs = await fetchProductsRunQuery();
+        const resp = await fetch(`${CLOUDINARY_LIST_URL}/all.json`);
+        if (!resp.ok) {
+            if (resp.status === 404) {
+                gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">No images uploaded yet. Upload your first design!</p>';
+                return;
+            }
+            throw new Error("Failed to load gallery: " + resp.status);
+        }
 
-        if (allDocs.length === 0) {
-            gallery.innerHTML = '<p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">No images uploaded yet.</p>';
+        const data = await resp.json();
+        const resources = data.resources || [];
+
+        if (resources.length === 0) {
+            gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">No images uploaded yet.</p>';
             return;
         }
 
-        // Sort Client-Side (descending by createdAt)
-        allDocs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        // Sort by created_at descending (newest first)
+        resources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         gallery.innerHTML = '';
-        allDocs.forEach((data) => {
+        resources.forEach(img => {
+            const imageUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_300,h_300/${img.public_id}`;
+            const context = img.context?.custom || {};
+            const category = context.category || 'Unknown';
+            const color = context.color || '';
+            const isFeatured = context.featured === 'true';
+
             const el = document.createElement('div');
-            el.className = 'product-card';
-            el.style.position = 'relative'; // Keep relative for delete button positioning
-
+            el.style.cssText = 'position: relative; border: 1px solid var(--color-text-secondary); border-radius: 8px; overflow: hidden;';
             el.innerHTML = `
-                <div class="product-image" style="background-image: url('${data.image}'); background-size: cover; background-position: center;"></div>
-                <h3>${data.category}</h3>
-                <p style="color: var(--color-text-secondary); font-size: 0.8rem;">${data.color}</p>
+                <img src="${imageUrl}" alt="${category}" style="width: 100%; height: 150px; object-fit: cover; display: block;">
+                <div style="padding: 0.5rem;">
+                    <p style="margin: 0; font-weight: bold; font-size: 0.85rem;">${category}</p>
+                    <p style="margin: 0; font-size: 0.75rem; color: var(--color-text-secondary);">${color}</p>
+                    ${isFeatured ? '<span style="font-size: 0.7rem; color: gold;">⭐ Featured</span>' : ''}
+                </div>
             `;
-
-            const isFeatured = data.isFeatured === true || data.isFeatured === "true"; // Handle string/bool
-            const starColor = isFeatured ? '#FFD700' : '#555';
-
-            const starBtn = document.createElement('button');
-            starBtn.innerHTML = "★";
-            starBtn.title = isFeatured ? "Unfeature" : "Feature in New Arrivals";
-            starBtn.style = `position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); color: ${starColor}; border: 1px solid ${starColor}; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center;`;
-            starBtn.onclick = () => toggleFeatured(data.id, isFeatured);
-
-            const delBtn = document.createElement('button');
-            delBtn.innerHTML = "&times;";
-            delBtn.style = "position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px; line-height: 1;";
-            delBtn.onclick = () => deleteProduct(data.id);
-
-            el.appendChild(starBtn);
-            el.appendChild(delBtn);
             gallery.appendChild(el);
         });
 
     } catch (error) {
-        console.error("Error loading gallery:", error);
+        console.error("Gallery error:", error);
         gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
     }
 }
 
-// 4b. Admin: Toggle Featured Status
-async function toggleFeatured(docId, currentStatus) {
-    const newStatus = !currentStatus;
-    try {
-        const headers = await getAuthHeaders();
-        const url = `${BASE_URL}/products/${docId}?updateMask.fieldPaths=isFeatured&key=${API_KEY}`;
-
-        await fetch(url, {
-            method: 'PATCH',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fields: {
-                    isFeatured: { booleanValue: newStatus }
-                }
-            })
-        });
-
-        renderGallery(); // Refresh UI
-        invalidateCache(); // Clear cache on toggle
-    } catch (error) {
-        console.error("Toggle feature error:", error);
-        alert("Failed to update status: " + error.message);
-    }
-}
-
-// 5. Admin: Delete Product (REST API)
-async function deleteProduct(docId) {
-    if (!confirm('Are you sure you want to remove this image?')) return;
-
-    try {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${BASE_URL}/products/${docId}?key=${API_KEY}`, {
-            method: 'DELETE',
-            headers
-        });
-
-        if (!response.ok) throw new Error("Delete failed: " + response.status);
-
-        renderGallery();
-        invalidateCache(); // Clear cache on delete
-    } catch (error) {
-        console.error("Delete error:", error);
-        alert("Delete failed: " + error.message);
-    }
-}
-
-// 6. Admin: Reset Database (Danger Zone)
-const resetDatabaseBtn = document.getElementById('reset-database-btn');
-if (resetDatabaseBtn) {
-    resetDatabaseBtn.addEventListener('click', async () => {
-        if (!confirm('⚠️ Are you sure you want to delete ALL products?\nThis cannot be undone!')) return;
-        if (!confirm('Double check: This will WIPE the entire database and start fresh. Proceed?')) return;
-
-        resetDatabaseBtn.disabled = true;
-        resetDatabaseBtn.innerText = "Deleting...";
-
-        try {
-            const products = await fetchProductsRunQuery();
-            if (products.length === 0) {
-                alert("Database is already empty.");
-                resetDatabaseBtn.disabled = false;
-                resetDatabaseBtn.innerText = "Reset Database";
-                return;
-            }
-
-            // Delete in parallel
-            const deletePromises = products.map(p => {
-                return getAuthHeaders().then(headers => {
-                    return fetch(`${BASE_URL}/products/${p.id}?key=${API_KEY}`, {
-                        method: 'DELETE',
-                        headers
-                    });
-                });
-            });
-
-            await Promise.all(deletePromises);
-
-            invalidateCache();
-            renderGallery();
-            alert("Database has been reset. You can now start from scratch.");
-
-        } catch (error) {
-            console.error("Reset failed:", error);
-            alert("Reset failed: " + error.message);
-        } finally {
-            resetDatabaseBtn.disabled = false;
-            resetDatabaseBtn.innerText = "Reset Database";
-        }
-    });
-}
-
-// 6. Public: Filter Logic (Home Page)
+// =============================================
+// 4. PUBLIC: Filter Logic (Home Page)
+// =============================================
 if (applyFiltersBtn) {
     applyFiltersBtn.addEventListener('click', () => {
         const selectedColors = Array.from(document.querySelectorAll('input[data-filter-type="color"]:checked')).map(cb => cb.value);
@@ -498,7 +221,9 @@ if (allProductsBtn) {
     });
 }
 
-// 7. Public: Render Results (Products Page)
+// =============================================
+// 5. PUBLIC: Products Page
+// =============================================
 if (window.location.pathname.includes('products.html')) {
     initProductsPage();
 }
@@ -530,30 +255,29 @@ async function initProductsPage() {
     productGrid.innerHTML = '<p>Loading products...</p>';
 
     try {
-        // Fetch ALL products via POST-based runQuery (bypasses GET firewall block)
-        const allDocs = await fetchProductsRunQuery();
-        allDocs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const allImages = await fetchAllImages();
 
-        const filteredDocs = [];
-        allDocs.forEach((data) => {
-            const colorMatch = colors.length === 0 || colors.includes(data.color);
-            const categoryMatch = categories.length === 0 || categories.includes(data.category);
-
-            if (colorMatch && categoryMatch) {
-                filteredDocs.push(data);
-            }
+        const filtered = allImages.filter(img => {
+            const context = img.context?.custom || {};
+            const colorMatch = colors.length === 0 || colors.includes(context.color);
+            const categoryMatch = categories.length === 0 || categories.includes(context.category);
+            return colorMatch && categoryMatch;
         });
 
-        if (filteredDocs.length === 0) {
+        if (filtered.length === 0) {
             productGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--color-text-secondary);">No products found matching these filters.</p>';
         } else {
-            productGrid.innerHTML = filteredDocs.map(img => `
-                <div class="product-card">
-                    <div class="product-image" style="background-image: url('${img.image}'); background-size: cover; background-position: center;"></div>
-                    <h3>${img.category}</h3>
-                    <p style="color: var(--color-text-secondary)">${img.color}</p>
-                </div>
-            `).join('');
+            productGrid.innerHTML = filtered.map(img => {
+                const imageUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_400,h_400/${img.public_id}`;
+                const context = img.context?.custom || {};
+                return `
+                    <div class="product-card">
+                        <div class="product-image" style="background-image: url('${imageUrl}'); background-size: cover; background-position: center;"></div>
+                        <h3>${context.category || 'Design'}</h3>
+                        <p style="color: var(--color-text-secondary)">${context.color || ''}</p>
+                    </div>
+                `;
+            }).join('');
         }
 
     } catch (error) {
@@ -562,11 +286,9 @@ async function initProductsPage() {
     }
 }
 
-function renderStats() {
-    // Determine stats from DB or keep static for now
-}
-
-// 8. Public: Render New Arrivals (Home Page)
+// =============================================
+// 6. PUBLIC: New Arrivals (Home Page — Featured)
+// =============================================
 if (document.getElementById('new-arrivals-container')) {
     loadNewArrivals();
 }
@@ -578,29 +300,52 @@ async function loadNewArrivals() {
     try {
         container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">Loading...</p>';
 
-        // Reuse existing fetch
-        const allDocs = await fetchProductsRunQuery();
+        // Fetch only "featured" tagged images
+        const resp = await fetch(`${CLOUDINARY_LIST_URL}/featured.json`);
 
-        // Filter for Featured and Sort
-        const featuredDocs = allDocs.filter(d => d.isFeatured === true || d.isFeatured === "true");
-        featuredDocs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        const displayDocs = featuredDocs.slice(0, 8); // Limit display
+        if (!resp.ok) {
+            if (resp.status === 404) {
+                container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">No featured items yet.</p>';
+                return;
+            }
+            throw new Error("Failed to load featured items");
+        }
 
-        if (displayDocs.length === 0) {
+        const data = await resp.json();
+        const resources = (data.resources || []).slice(0, 8);
+
+        if (resources.length === 0) {
             container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-secondary);">No featured items yet.</p>';
             return;
         }
 
-        container.innerHTML = displayDocs.map(img => `
-            <div class="product-card">
-                <div class="product-image" style="background-image: url('${img.image}'); background-size: cover; background-position: center;"></div>
-                <h3>${img.category}</h3>
-                <p style="color: var(--color-text-secondary)">${img.color}</p>
-            </div>
-        `).join('');
+        container.innerHTML = resources.map(img => {
+            const imageUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_400,h_400/${img.public_id}`;
+            const context = img.context?.custom || {};
+            return `
+                <div class="product-card">
+                    <div class="product-image" style="background-image: url('${imageUrl}'); background-size: cover; background-position: center;"></div>
+                    <h3>${context.category || 'Design'}</h3>
+                    <p style="color: var(--color-text-secondary)">${context.color || ''}</p>
+                </div>
+            `;
+        }).join('');
 
     } catch (error) {
         console.error("Error loading new arrivals:", error);
         container.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: red;">Failed to load items.</p>`;
     }
+}
+
+// =============================================
+// HELPER: Fetch all images from Cloudinary
+// =============================================
+async function fetchAllImages() {
+    const resp = await fetch(`${CLOUDINARY_LIST_URL}/all.json`);
+    if (!resp.ok) {
+        if (resp.status === 404) return [];
+        throw new Error("Failed to fetch images");
+    }
+    const data = await resp.json();
+    return data.resources || [];
 }
