@@ -207,35 +207,24 @@ async function renderGallery() {
         gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
     }
 
-    // Step 2: Fetch ALL images from Cloudinary Admin API (no cache, no tag requirement)
+    // Step 2: Sync from Cloudinary list endpoint + merge with local cache
     try {
-        const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
-        const resp = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?max_results=500&context=true&tags=true`,
-            { headers: { 'Authorization': authHeader } }
-        );
+        const resp = await fetch(`${CLOUDINARY_LIST_URL}/all.json`);
+        if (resp.ok) {
+            const data = await resp.json();
+            const cloudResources = data.resources || [];
 
-        if (!resp.ok) {
-            throw new Error("Failed to load gallery: " + resp.status);
+            // Merge: start with cloud data, add any locally-cached items not yet in cloud list
+            const cloudIds = new Set(cloudResources.map(r => r.public_id));
+            const localOnly = (cached || []).filter(r => !cloudIds.has(r.public_id));
+            allResources = [...localOnly, ...cloudResources];
+            allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            saveGalleryCache();
+            applyGalleryFilter();
         }
-
-        const data = await resp.json();
-        allResources = (data.resources || []).map(r => ({
-            public_id: r.public_id,
-            format: r.format,
-            created_at: r.created_at,
-            tags: r.tags || [],
-            context: r.context || {}
-        }));
-        allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        saveGalleryCache();
-        applyGalleryFilter();
-
+        // If 404 or error, just keep showing cached data
     } catch (error) {
         console.error("Gallery sync error:", error);
-        if (!cached || cached.length === 0) {
-            gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
-        }
     }
 }
 
