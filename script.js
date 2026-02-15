@@ -59,86 +59,7 @@ function updateNavigation() {
     if (!navList) return;
 
     if (isLoggedIn()) {
-        // Sync Button Logic
-        const syncBtn = document.getElementById('sync-public-btn');
-        if (syncBtn) {
-            syncBtn.addEventListener('click', async () => {
-                if (!confirm("This will overwrite Cloudinary tags with your local Admin list. Continue?")) return;
 
-                syncBtn.innerText = "Syncing...";
-                syncBtn.disabled = true;
-
-                try {
-                    const featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
-                    const unfeaturedIds = JSON.parse(localStorage.getItem('kp_unfeatured_ids') || '[]');
-
-                    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/explicit`;
-
-                    // Helper to update tags & context
-                    const updateResource = async (id, isFeatured) => {
-                        // Find current tags from memory
-                        const resource = allResources.find(r => r.public_id === id);
-                        let currentTags = resource ? (resource.tags || []) : [];
-
-                        // Safety: If we can't find resource, we skip tag update to avoid wiping data
-                        // But wait, if we skip, we don't fix the issue.
-                        // We must assume allResources is reasonably up to date.
-                        // Filter out 'featured' first
-                        currentTags = currentTags.filter(t => t !== 'featured');
-
-                        if (isFeatured) {
-                            currentTags.push('featured');
-                        }
-
-                        const newTagStr = currentTags.join(',');
-                        const timestamp = Math.round(Date.now() / 1000);
-                        const contextVal = isFeatured ? 'featured=true' : 'featured=false';
-
-                        // Params to sign
-                        const paramsToSign = {
-                            context: contextVal,
-                            public_id: id,
-                            tags: newTagStr,
-                            timestamp: timestamp,
-                            type: 'upload'
-                        };
-                        const signature = await generateSignature(paramsToSign);
-
-                        const formData = new FormData();
-                        formData.append('public_id', id);
-                        formData.append('type', 'upload');
-                        formData.append('context', contextVal);
-                        formData.append('tags', newTagStr); // Replaces tags with new list
-                        formData.append('timestamp', timestamp);
-                        formData.append('api_key', CLOUDINARY_API_KEY);
-                        formData.append('signature', signature);
-
-                        await fetch(url, { method: 'POST', body: formData });
-                    };
-
-                    // Process all in parallel
-                    const promises = [];
-
-                    for (const id of featuredIds) {
-                        promises.push(updateResource(id, true));
-                    }
-                    for (const id of unfeaturedIds) {
-                        promises.push(updateResource(id, false));
-                    }
-
-                    await Promise.all(promises);
-
-                    alert("Sync Complete! 🚀\nIMPORTANT: It may take 1-2 minutes for Cloudinary to update the 'featured.json' list.\nPlease wait a bit before refreshing public site.");
-
-                } catch (e) {
-                    console.error("Sync failed", e);
-                    alert("Sync failed: " + e.message);
-                } finally {
-                    syncBtn.innerText = "🔄 Force Sync Featured to Public Site";
-                    syncBtn.disabled = false;
-                }
-            });
-        }
 
         // Dashboard Link
         const dashboardLi = document.createElement('li');
@@ -640,19 +561,36 @@ async function toggleFeatured(publicId, currentTags) {
                 toggleBtn.style.borderColor = isFeatured ? '#ff4444' : 'gold';
                 toggleBtn.style.color = isFeatured ? '#ff4444' : 'gold';
                 toggleBtn.style.background = isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)';
-                // Call Cloudinary Upload API ('explicit' method) to update Context
-                // This works client-side (CORS allowed) and merges context (safe)
+
+                // Call Cloudinary Upload API ('explicit' method) to update Context AND Tags
+                // This ensures public site (which relies on Tags) works automatically
                 const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/explicit`;
 
                 try {
+                    // Find current tags from memory to preserve them
+                    // allResources is available globally
+                    const resource = allResources.find(r => r.public_id === publicId);
+                    let currentTags = resource ? (resource.tags || []) : [];
+
+                    // Filter out 'featured' first
+                    currentTags = currentTags.filter(t => t !== 'featured');
+
+                    if (isFeatured) {
+                        currentTags.push('featured');
+                    }
+
+                    // Update the local resource object immediately so subsequent clicks are accurate
+                    if (resource) resource.tags = currentTags;
+
+                    const newTagStr = currentTags.join(',');
                     const timestamp = Math.round(Date.now() / 1000);
                     const contextVal = isFeatured ? 'featured=true' : 'featured=false';
 
-                    // Params to sign (alphabetical order required by Cloudinary)
-                    // public_id, timestamp, type='upload', context
+                    // Params to sign
                     const paramsToSign = {
                         context: contextVal,
                         public_id: publicId,
+                        tags: newTagStr,
                         timestamp: timestamp,
                         type: 'upload'
                     };
@@ -662,6 +600,7 @@ async function toggleFeatured(publicId, currentTags) {
                     formData.append('public_id', publicId);
                     formData.append('type', 'upload');
                     formData.append('context', contextVal);
+                    formData.append('tags', newTagStr);
                     formData.append('timestamp', timestamp);
                     formData.append('api_key', CLOUDINARY_API_KEY);
                     formData.append('signature', signature);
@@ -676,7 +615,7 @@ async function toggleFeatured(publicId, currentTags) {
                         throw new Error(err.error?.message || 'Failed to update');
                     }
 
-                    console.log(isFeatured ? 'Context set to Featured!' : 'Context set to Unfeatured!');
+                    console.log(isFeatured ? 'Cloudinary Updated (Featured)' : 'Cloudinary Updated (Unfeatured)');
                 } catch (error) {
                     console.error('Toggle error:', error);
                     alert('Toggle failed: ' + error.message);
