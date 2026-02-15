@@ -211,6 +211,7 @@ if (uploadForm) {
 
             alert(`Upload Successful! (${sizeInKB} KB)`);
             uploadForm.reset();
+            invalidateCache(); // Clear cache on new upload
             renderGallery();
         } catch (error) {
             console.error("Upload error:", error);
@@ -260,8 +261,43 @@ function parseFirestoreDoc(doc) {
     return { id, ...data };
 }
 
+const CACHE_KEY = 'products_cache';
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+function getCachedProducts() {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (!cached) return null;
+
+    try {
+        const { timestamp, data } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+            console.log("Serving from cache");
+            return data;
+        }
+    } catch (e) {
+        console.error("Cache parse error", e);
+    }
+    return null;
+}
+
+function setCachedProducts(data) {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+        timestamp: Date.now(),
+        data: data
+    }));
+}
+
+function invalidateCache() {
+    sessionStorage.removeItem(CACHE_KEY);
+    console.log("Cache invalidated");
+}
+
 // Helper: Fetch products using POST-based :runQuery (bypasses GET firewall block)
 async function fetchProductsRunQuery() {
+    // Try cache first
+    const cached = getCachedProducts();
+    if (cached) return cached;
+
     const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/default/documents:runQuery`;
     const headers = await getAuthHeaders();
     headers['Content-Type'] = 'application/json';
@@ -283,9 +319,12 @@ async function fetchProductsRunQuery() {
 
     const results = await response.json();
     // runQuery returns [{document: {...}}, ...] - filter out empty results
-    return results
+    const products = results
         .filter(r => r.document)
         .map(r => parseFirestoreDoc(r.document));
+
+    setCachedProducts(products); // Store in cache
+    return products;
 }
 
 // 4. Admin: Render Gallery (REST API via runQuery POST)
@@ -359,6 +398,7 @@ async function toggleFeatured(docId, currentStatus) {
         });
 
         renderGallery(); // Refresh UI
+        invalidateCache(); // Clear cache on toggle
     } catch (error) {
         console.error("Toggle feature error:", error);
         alert("Failed to update status: " + error.message);
@@ -379,6 +419,7 @@ async function deleteProduct(docId) {
         if (!response.ok) throw new Error("Delete failed: " + response.status);
 
         renderGallery();
+        invalidateCache(); // Clear cache on delete
     } catch (error) {
         console.error("Delete error:", error);
         alert("Delete failed: " + error.message);
