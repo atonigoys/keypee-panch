@@ -253,6 +253,20 @@ footer {
         flex-direction: column;
     }
 
+    /* Stack Header for Mobile */
+    header {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    nav ul {
+        gap: 1rem;
+        font-size: 0.85rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
     .sidebar {
         width: 100%;
         border-right: none;
@@ -260,11 +274,6 @@ footer {
         height: auto;
         position: relative;
         top: 0;
-    }
-
-    nav ul {
-        gap: var(--spacing-md);
-        font-size: 0.8rem;
     }
 
     h1 {
