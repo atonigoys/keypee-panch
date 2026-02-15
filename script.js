@@ -432,6 +432,51 @@ async function deleteProduct(docId) {
     }
 }
 
+// 6. Admin: Reset Database (Danger Zone)
+const resetDatabaseBtn = document.getElementById('reset-database-btn');
+if (resetDatabaseBtn) {
+    resetDatabaseBtn.addEventListener('click', async () => {
+        if (!confirm('⚠️ Are you sure you want to delete ALL products?\nThis cannot be undone!')) return;
+        if (!confirm('Double check: This will WIPE the entire database and start fresh. Proceed?')) return;
+
+        resetDatabaseBtn.disabled = true;
+        resetDatabaseBtn.innerText = "Deleting...";
+
+        try {
+            const products = await fetchProductsRunQuery();
+            if (products.length === 0) {
+                alert("Database is already empty.");
+                resetDatabaseBtn.disabled = false;
+                resetDatabaseBtn.innerText = "Reset Database";
+                return;
+            }
+
+            // Delete in parallel
+            const deletePromises = products.map(p => {
+                return getAuthHeaders().then(headers => {
+                    return fetch(`${BASE_URL}/products/${p.id}?key=${API_KEY}`, {
+                        method: 'DELETE',
+                        headers
+                    });
+                });
+            });
+
+            await Promise.all(deletePromises);
+
+            invalidateCache();
+            renderGallery();
+            alert("Database has been reset. You can now start from scratch.");
+
+        } catch (error) {
+            console.error("Reset failed:", error);
+            alert("Reset failed: " + error.message);
+        } finally {
+            resetDatabaseBtn.disabled = false;
+            resetDatabaseBtn.innerText = "Reset Database";
+        }
+    });
+}
+
 // 6. Public: Filter Logic (Home Page)
 if (applyFiltersBtn) {
     applyFiltersBtn.addEventListener('click', () => {
