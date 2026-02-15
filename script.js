@@ -89,7 +89,7 @@ if (loginForm) {
             window.location.href = 'admin.html';
         } catch (error) {
             console.error(error);
-            errorMsg.innerText = "Invalid credentials: " + error.message;
+            errorMsg.innerText = "Invalid username or password";
             errorMsg.style.display = 'block';
         }
     });
