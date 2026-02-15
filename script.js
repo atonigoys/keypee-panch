@@ -6,7 +6,22 @@
 const CLOUD_NAME = "dabwa174p";
 const UPLOAD_PRESET = "Keypeepanch"; // Unsigned preset
 const CLOUDINARY_LIST_URL = `https://res.cloudinary.com/${CLOUD_NAME}/image/list`;
+const CLOUDINARY_API_KEY = "791274659166275";
+const CLOUDINARY_API_SECRET = "KqoMlHuFEr0dYTVEaw92ccY4mVM";
 const ADMIN_PASSWORD = "admin123"; // Change this to your preferred password
+
+// --- SHA-1 Helper for Cloudinary Signatures ---
+async function sha1(message) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(message);
+    const hash = await crypto.subtle.digest('SHA-1', data);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function generateSignature(params) {
+    const sorted = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join('&');
+    return await sha1(sorted + CLOUDINARY_API_SECRET);
+}
 
 // --- DOM Elements ---
 const loginForm = document.getElementById('login-form');
@@ -177,7 +192,7 @@ async function renderGallery() {
             const context = img.context?.custom || {};
             const category = context.category || 'Unknown';
             const color = context.color || '';
-            const isFeatured = context.featured === 'true';
+            const isFeatured = img.tags?.includes('featured') || false;
 
             const el = document.createElement('div');
             el.style.cssText = 'position: relative; border: 1px solid var(--color-text-secondary); border-radius: 8px; overflow: hidden;';
@@ -186,7 +201,17 @@ async function renderGallery() {
                 <div style="padding: 0.5rem;">
                     <p style="margin: 0; font-weight: bold; font-size: 0.85rem;">${category}</p>
                     <p style="margin: 0; font-size: 0.75rem; color: var(--color-text-secondary);">${color}</p>
-                    ${isFeatured ? '<span style="font-size: 0.7rem; color: gold;">⭐ Featured</span>' : ''}
+                    ${isFeatured ? '<span style="font-size: 0.7rem; color: gold;">⭐ Featured</span>' : '<span style="font-size: 0.7rem; color: var(--color-text-secondary);">Not Featured</span>'}
+                </div>
+                <div style="display: flex; gap: 0.25rem; padding: 0 0.5rem 0.5rem;">
+                    <button onclick="toggleFeatured('${img.public_id}', ${isFeatured})" 
+                        style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid ${isFeatured ? '#ff4444' : 'gold'}; background: ${isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)'}; color: ${isFeatured ? '#ff4444' : 'gold'}; border-radius: 4px;">
+                        ${isFeatured ? '★ Unfeature' : '☆ Feature'}
+                    </button>
+                    <button onclick="deleteImage('${img.public_id}')" 
+                        style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid #ff4444; background: rgba(255,68,68,0.2); color: #ff4444; border-radius: 4px;">
+                        🗑 Delete
+                    </button>
                 </div>
             `;
             gallery.appendChild(el);
@@ -195,6 +220,83 @@ async function renderGallery() {
     } catch (error) {
         console.error("Gallery error:", error);
         gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
+    }
+}
+
+// =============================================
+// 3b. ADMIN: Delete Image
+// =============================================
+async function deleteImage(publicId) {
+    if (!confirm(`Delete this image?\nThis cannot be undone.`)) return;
+
+    try {
+        const timestamp = Math.round(Date.now() / 1000);
+        const signature = await generateSignature({ public_id: publicId, timestamp });
+
+        const formData = new FormData();
+        formData.append("public_id", publicId);
+        formData.append("api_key", CLOUDINARY_API_KEY);
+        formData.append("timestamp", timestamp);
+        formData.append("signature", signature);
+
+        const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`, {
+            method: "POST",
+            body: formData
+        });
+
+        const result = await resp.json();
+        if (result.result === "ok") {
+            alert("Image deleted!");
+            renderGallery();
+        } else {
+            throw new Error(result.result || "Delete failed");
+        }
+    } catch (error) {
+        console.error("Delete error:", error);
+        alert("Delete failed: " + error.message);
+    }
+}
+
+// =============================================
+// 3c. ADMIN: Toggle Featured
+// =============================================
+async function toggleFeatured(publicId, currentlyFeatured) {
+    const action = currentlyFeatured ? "remove_tag" : "add_tag";
+    const label = currentlyFeatured ? "Removing from featured..." : "Adding to featured...";
+
+    try {
+        const timestamp = Math.round(Date.now() / 1000);
+        const params = {
+            command: action,
+            "public_ids[]": publicId,
+            tag: "featured",
+            timestamp: timestamp
+        };
+        const signature = await generateSignature(params);
+
+        const formData = new FormData();
+        formData.append("command", action);
+        formData.append("public_ids[]", publicId);
+        formData.append("tag", "featured");
+        formData.append("api_key", CLOUDINARY_API_KEY);
+        formData.append("timestamp", timestamp);
+        formData.append("signature", signature);
+
+        const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/tags`, {
+            method: "POST",
+            body: formData
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error?.message || "Failed to update");
+        }
+
+        alert(currentlyFeatured ? "Removed from Featured!" : "Added to Featured!");
+        renderGallery();
+    } catch (error) {
+        console.error("Toggle error:", error);
+        alert("Toggle failed: " + error.message);
     }
 }
 
