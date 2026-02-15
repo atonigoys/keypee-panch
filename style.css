@@ -302,6 +302,10 @@ footer {
         display: block !important;
     }
 
+    #mobile-all-products {
+        display: inline-block !important;
+    }
+
     /* 2-Column Grid for Mobile (Public & Admin) */
     .product-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
