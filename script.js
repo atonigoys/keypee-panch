@@ -207,28 +207,32 @@ async function renderGallery() {
         gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
     }
 
-    // Step 2: Background sync from Cloudinary (updates silently)
+    // Step 2: Fetch ALL images from Cloudinary Admin API (no cache, no tag requirement)
     try {
-        const resp = await fetch(`${CLOUDINARY_LIST_URL}/all.json`);
+        const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
+        const resp = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?max_results=500&context=true&tags=true`,
+            { headers: { 'Authorization': authHeader } }
+        );
+
         if (!resp.ok) {
-            if (resp.status === 404) {
-                allResources = [];
-                saveGalleryCache();
-                applyGalleryFilter();
-                return;
-            }
             throw new Error("Failed to load gallery: " + resp.status);
         }
 
         const data = await resp.json();
-        allResources = data.resources || [];
+        allResources = (data.resources || []).map(r => ({
+            public_id: r.public_id,
+            format: r.format,
+            created_at: r.created_at,
+            tags: r.tags || [],
+            context: r.context || {}
+        }));
         allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         saveGalleryCache();
         applyGalleryFilter();
 
     } catch (error) {
         console.error("Gallery sync error:", error);
-        // If we have cached data, keep showing it
         if (!cached || cached.length === 0) {
             gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
         }
