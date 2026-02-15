@@ -9,91 +9,94 @@
 </head>
 
 <body>
-    <header>
-        <div class="logo">KEYPEE PANCH <span
-                style="font-size: 0.8rem; background: var(--color-text-primary); color: var(--color-bg); padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 10px;">ADMIN</span>
-        </div>
-        <nav>
-            <ul>
-                <li><a href="index.html">Home</a></li>
-                <li><a href="services.html">Services</a></li>
-                <li><a href="social.html">Social</a></li>
-                <li><a href="offer.html">Offer</a></li>
-            </ul>
-        </nav>
-    </header>
-
-    <main>
-        <div class="container">
-            <h1>Admin Dashboard</h1>
-            <!-- Description Removed -->
-
-            <!-- Stats Removed -->
-
-            <!-- Upload Section -->
-            <div class="upload-container">
-                <h2 style="margin-bottom: 1.5rem;">Upload New Design</h2>
-                <form id="upload-form" class="upload-form">
-                    <div class="form-group">
-                        <label>Category</label>
-                        <select id="upload-category">
-                            <option value="Shirt">Shirt</option>
-                            <option value="Poloshirt">Poloshirt</option>
-                            <option value="Longsleeve">Longsleeve</option>
-                            <option value="Sleeveless">Sleeveless</option>
-                            <option value="Full Set Jersey">Full Set Jersey</option>
-                            <option value="Logo">Logo</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Color</label>
-                        <select id="upload-color">
-                            <option value="Black">Black</option>
-                            <option value="White">White</option>
-                            <option value="Blue">Blue</option>
-                            <option value="Red">Red</option>
-                            <option value="Green">Green</option>
-                            <option value="Yellow">Yellow</option>
-                            <option value="Orange">Orange</option>
-                            <option value="Purple">Purple</option>
-                            <option value="Pink">Pink</option>
-                            <option value="Cyan">Cyan</option>
-                            <option value="Beige">Beige</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Image File</label>
-                        <input type="file" id="upload-file" accept="image/*" required>
-                    </div>
-                    <div class="form-group"
-                        style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem; margin-bottom: 1rem;">
-                        <input type="checkbox" id="upload-featured"
-                            style="width: auto; height: 1.2rem; width: 1.2rem; accent-color: var(--color-text-primary);">
-                        <label for="upload-featured" style="margin: 0; cursor: pointer;">Show in "Featured
-                            Design"</label>
-                    </div>
-                    <div>
-                        <button type="submit" class="btn" style="width: 100%;">Upload Design</button>
-                    </div>
-                </form>
+    <div id="admin-page-wrapper" style="display: none;">
+        <header>
+            <div class="logo">KEYPEE PANCH <span
+                    style="font-size: 0.8rem; background: var(--color-text-primary); color: var(--color-bg); padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 10px;">ADMIN</span>
             </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="services.html">Services</a></li>
+                    <li><a href="social.html">Social</a></li>
+                    <li><a href="offer.html">Offer</a></li>
+                </ul>
+            </nav>
+        </header>
 
-            <!-- Recent Uploads Gallery -->
-            <h2 style="margin-bottom: 1.5rem;">Recent Uploads</h2>
-            <div id="upload-gallery"
-                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 4rem;">
-                <!-- Gallery items will be injected here by JS -->
-                <p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">No images uploaded
-                    yet.</p>
+        <main id="admin-content">
+            <div class="container">
+                <h1>Admin Dashboard</h1>
+                <!-- Description Removed -->
+
+                <!-- Stats Removed -->
+
+                <!-- Upload Section -->
+                <div class="upload-container">
+                    <h2 style="margin-bottom: 1.5rem;">Upload New Design</h2>
+                    <form id="upload-form" class="upload-form">
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="upload-category">
+                                <option value="Shirt">Shirt</option>
+                                <option value="Poloshirt">Poloshirt</option>
+                                <option value="Longsleeve">Longsleeve</option>
+                                <option value="Sleeveless">Sleeveless</option>
+                                <option value="Full Set Jersey">Full Set Jersey</option>
+                                <option value="Logo">Logo</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Color</label>
+                            <select id="upload-color">
+                                <option value="Black">Black</option>
+                                <option value="White">White</option>
+                                <option value="Blue">Blue</option>
+                                <option value="Red">Red</option>
+                                <option value="Green">Green</option>
+                                <option value="Yellow">Yellow</option>
+                                <option value="Orange">Orange</option>
+                                <option value="Purple">Purple</option>
+                                <option value="Pink">Pink</option>
+                                <option value="Cyan">Cyan</option>
+                                <option value="Beige">Beige</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Image File</label>
+                            <input type="file" id="upload-file" accept="image/*" required>
+                        </div>
+                        <div class="form-group"
+                            style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem; margin-bottom: 1rem;">
+                            <input type="checkbox" id="upload-featured"
+                                style="width: auto; height: 1.2rem; width: 1.2rem; accent-color: var(--color-text-primary);">
+                            <label for="upload-featured" style="margin: 0; cursor: pointer;">Show in "Featured
+                                Design"</label>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn" style="width: 100%;">Upload Design</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Recent Uploads Gallery -->
+                <h2 style="margin-bottom: 1.5rem;">Recent Uploads</h2>
+                <div id="upload-gallery"
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 4rem;">
+                    <!-- Gallery items will be injected here by JS -->
+                    <p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">No images
+                        uploaded
+                        yet.</p>
+                </div>
+
+                <!-- Recent Orders Removed -->
             </div>
+        </main>
 
-            <!-- Recent Orders Removed -->
-        </div>
-    </main>
-
-    <footer>
-        <p>&copy; 2026 KEYPEE PANCH. All rights reserved.</p>
-    </footer>
+        <footer>
+            <p>&copy; 2026 KEYPEE PANCH. All rights reserved.</p>
+        </footer>
+    </div>
 
     <script type="module" src="script.js?v=4"></script>
 </body>

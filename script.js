@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // DOM Elements
@@ -10,21 +10,32 @@ const applyFiltersBtn = document.getElementById('apply-filters');
 const recentOrdersTable = document.querySelector('table tbody');
 const gallery = document.getElementById('upload-gallery');
 
-// 1. Authentication State Observer
-onAuthStateChanged(auth, (user) => {
-    updateNavigation(user);
+// 0. Enforce Session Persistence Globally
+// This ensures that even if you had a 'Remember Me' session from before, it's converted to Session Only (clears on close)
+setPersistence(auth, browserSessionPersistence)
+    .then(() => {
+        console.log("Persistence set to SESSION");
 
-    // Protect Admin Page
-    if (window.location.pathname.includes('admin.html') && !user) {
-        window.location.href = 'login.html';
-    }
+        // 1. Authentication State Observer (Only attach after persistence is set)
+        onAuthStateChanged(auth, (user) => {
+            updateNavigation(user);
 
-    // Admin Page Logic on Load
-    if (window.location.pathname.includes('admin.html') && user) {
-        renderGallery();
-        renderStats(); // Simulated for now
-    }
-});
+            // Protect Admin Page
+            if (window.location.pathname.includes('admin.html') && !user) {
+                window.location.href = 'login.html';
+            }
+
+            // Admin Page Logic on Load
+            if (window.location.pathname.includes('admin.html') && user) {
+                const wrapper = document.getElementById('admin-page-wrapper');
+                if (wrapper) wrapper.style.display = 'block';
+
+                renderGallery();
+                renderStats(); // Simulated for now
+            }
+        });
+    })
+    .catch((error) => console.error("Persistence error", error));
 
 function updateNavigation(user) {
     if (!navList) return;
@@ -72,6 +83,7 @@ if (loginForm) {
         const errorMsg = document.getElementById('error-msg');
 
         try {
+            await setPersistence(auth, browserSessionPersistence);
             await signInWithEmailAndPassword(auth, email, password);
             window.location.href = 'admin.html';
         } catch (error) {
