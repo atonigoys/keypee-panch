@@ -174,6 +174,9 @@ if (uploadForm) {
 // =============================================
 // 3. ADMIN: Render Gallery from Cloudinary
 // =============================================
+let allResources = []; // Store all images for filtering
+let currentFilter = 'all';
+
 async function renderGallery() {
     if (!gallery) return;
     gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
@@ -182,31 +185,68 @@ async function renderGallery() {
         const resp = await fetch(`${CLOUDINARY_LIST_URL}/all.json`);
         if (!resp.ok) {
             if (resp.status === 404) {
-                gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">No images uploaded yet. Upload your first design!</p>';
+                allResources = [];
+                applyGalleryFilter();
                 return;
             }
             throw new Error("Failed to load gallery: " + resp.status);
         }
 
         const data = await resp.json();
-        const resources = data.resources || [];
-
-        if (resources.length === 0) {
-            gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">No images uploaded yet.</p>';
-            return;
-        }
+        allResources = data.resources || [];
 
         // Sort by created_at descending (newest first)
-        resources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-        gallery.innerHTML = '';
-        resources.forEach(img => addGalleryCard(img, false));
+        applyGalleryFilter();
 
     } catch (error) {
         console.error("Gallery error:", error);
         gallery.innerHTML = `<p style="color: red; font-weight: bold;">${error.message}</p>`;
     }
 }
+
+function applyGalleryFilter() {
+    if (!gallery) return;
+
+    let filtered = allResources;
+    if (currentFilter === 'featured') {
+        filtered = allResources.filter(img => (img.tags || []).includes('featured'));
+    }
+
+    // Update image count
+    const countEl = document.getElementById('image-count');
+    if (countEl) {
+        countEl.textContent = `${filtered.length} image${filtered.length !== 1 ? 's' : ''}`;
+    }
+
+    if (filtered.length === 0) {
+        gallery.innerHTML = `<p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">
+            ${currentFilter === 'featured' ? 'No featured images yet.' : 'No images uploaded yet. Upload your first design!'}
+        </p>`;
+        return;
+    }
+
+    gallery.innerHTML = '';
+    filtered.forEach(img => addGalleryCard(img, false));
+}
+
+// Gallery filter buttons
+document.querySelectorAll('.gallery-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentFilter = btn.dataset.filter;
+
+        // Update active styles
+        document.querySelectorAll('.gallery-filter').forEach(b => {
+            b.style.background = 'transparent';
+            b.style.color = b.dataset.filter === 'featured' ? 'gold' : 'var(--color-text-primary)';
+        });
+        btn.style.background = btn.dataset.filter === 'featured' ? 'gold' : 'var(--color-text-primary)';
+        btn.style.color = 'var(--color-bg)';
+
+        applyGalleryFilter();
+    });
+});
 
 // =============================================
 // 3a-helper. Create a gallery card element
