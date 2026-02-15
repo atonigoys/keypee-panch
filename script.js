@@ -192,7 +192,9 @@ async function renderGallery() {
             const context = img.context?.custom || {};
             const category = context.category || 'Unknown';
             const color = context.color || '';
-            const isFeatured = img.tags?.includes('featured') || false;
+            const currentTags = img.tags || [];
+            const isFeatured = currentTags.includes('featured');
+            const tagsJson = JSON.stringify(currentTags).replace(/'/g, "\\'");
 
             const el = document.createElement('div');
             el.style.cssText = 'position: relative; border: 1px solid var(--color-text-secondary); border-radius: 8px; overflow: hidden;';
@@ -204,16 +206,21 @@ async function renderGallery() {
                     ${isFeatured ? '<span style="font-size: 0.7rem; color: gold;">⭐ Featured</span>' : '<span style="font-size: 0.7rem; color: var(--color-text-secondary);">Not Featured</span>'}
                 </div>
                 <div style="display: flex; gap: 0.25rem; padding: 0 0.5rem 0.5rem;">
-                    <button onclick="toggleFeatured('${img.public_id}', ${isFeatured})" 
+                    <button class="toggle-btn"
                         style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid ${isFeatured ? '#ff4444' : 'gold'}; background: ${isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)'}; color: ${isFeatured ? '#ff4444' : 'gold'}; border-radius: 4px;">
                         ${isFeatured ? '★ Unfeature' : '☆ Feature'}
                     </button>
-                    <button onclick="deleteImage('${img.public_id}')" 
+                    <button class="delete-btn"
                         style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid #ff4444; background: rgba(255,68,68,0.2); color: #ff4444; border-radius: 4px;">
                         🗑 Delete
                     </button>
                 </div>
             `;
+
+            // Attach event listeners (avoids inline onclick issues with special chars)
+            el.querySelector('.toggle-btn').addEventListener('click', () => toggleFeatured(img.public_id, currentTags));
+            el.querySelector('.delete-btn').addEventListener('click', () => deleteImage(img.public_id));
+
             gallery.appendChild(el);
         });
 
@@ -258,45 +265,53 @@ async function deleteImage(publicId) {
 }
 
 // =============================================
-// 3c. ADMIN: Toggle Featured
+// 3c. ADMIN: Toggle Featured (via /image/explicit)
 // =============================================
-async function toggleFeatured(publicId, currentlyFeatured) {
-    const action = currentlyFeatured ? "remove_tag" : "add_tag";
-    const label = currentlyFeatured ? "Removing from featured..." : "Adding to featured...";
+async function toggleFeatured(publicId, currentTags) {
+    const isFeatured = currentTags.includes('featured');
+
+    // Build new tags list
+    let newTags;
+    if (isFeatured) {
+        newTags = currentTags.filter(t => t !== 'featured');
+    } else {
+        newTags = [...currentTags, 'featured'];
+    }
+    const tagsString = newTags.join(',');
 
     try {
         const timestamp = Math.round(Date.now() / 1000);
         const params = {
-            command: action,
-            "public_ids[]": publicId,
-            tag: "featured",
-            timestamp: timestamp
+            public_id: publicId,
+            tags: tagsString,
+            timestamp: timestamp,
+            type: 'upload'
         };
         const signature = await generateSignature(params);
 
         const formData = new FormData();
-        formData.append("command", action);
-        formData.append("public_ids[]", publicId);
-        formData.append("tag", "featured");
-        formData.append("api_key", CLOUDINARY_API_KEY);
-        formData.append("timestamp", timestamp);
-        formData.append("signature", signature);
+        formData.append('public_id', publicId);
+        formData.append('tags', tagsString);
+        formData.append('type', 'upload');
+        formData.append('api_key', CLOUDINARY_API_KEY);
+        formData.append('timestamp', timestamp);
+        formData.append('signature', signature);
 
-        const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/tags`, {
-            method: "POST",
+        const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/explicit`, {
+            method: 'POST',
             body: formData
         });
 
         if (!resp.ok) {
             const err = await resp.json();
-            throw new Error(err.error?.message || "Failed to update");
+            throw new Error(err.error?.message || 'Failed to update');
         }
 
-        alert(currentlyFeatured ? "Removed from Featured!" : "Added to Featured!");
+        alert(isFeatured ? 'Removed from Featured!' : 'Added to Featured!');
         renderGallery();
     } catch (error) {
-        console.error("Toggle error:", error);
-        alert("Toggle failed: " + error.message);
+        console.error('Toggle error:', error);
+        alert('Toggle failed: ' + error.message);
     }
 }
 
