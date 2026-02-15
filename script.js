@@ -59,6 +59,55 @@ function updateNavigation() {
     if (!navList) return;
 
     if (isLoggedIn()) {
+        // Sync Button Logic
+        const syncBtn = document.getElementById('sync-public-btn');
+        if (syncBtn) {
+            syncBtn.addEventListener('click', async () => {
+                if (!confirm("This will overwrite Cloudinary tags with your local Admin list. Continue?")) return;
+
+                syncBtn.innerText = "Syncing...";
+                syncBtn.disabled = true;
+
+                try {
+                    const featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
+                    const unfeaturedIds = JSON.parse(localStorage.getItem('kp_unfeatured_ids') || '[]');
+
+                    const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
+                    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image/tags`;
+
+                    // Helper to update tag
+                    const updateTag = async (id, cmd) => {
+                        await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tag: 'featured', public_ids: [id], command: cmd })
+                        });
+                    };
+
+                    // Process all featured
+                    for (const id of featuredIds) {
+                        await updateTag(id, 'add');
+                    }
+
+                    // Process all unfeatured
+                    for (const id of unfeaturedIds) {
+                        await updateTag(id, 'remove');
+                    }
+
+                    alert("Sync Complete! Public site should be updated.");
+                    // Clear local list of 'unfeatured' since cloud is now consistent? 
+                    // No, keep it for strict local override potential.
+
+                } catch (e) {
+                    console.error("Sync failed", e);
+                    alert("Sync failed: " + e.message);
+                } finally {
+                    syncBtn.innerText = "🔄 Force Sync Featured to Public Site";
+                    syncBtn.disabled = false;
+                }
+            });
+        }
+
         // Dashboard Link
         const dashboardLi = document.createElement('li');
         dashboardLi.id = 'dashboard-link';
@@ -564,40 +613,24 @@ async function toggleFeatured(publicId, currentTags) {
             }
         }
 
-        // Call Cloudinary API in background
+        // Call Cloudinary Admin API (Reliable Sync)
         const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image/tags`;
-        const formData = new FormData();
-        formData.append('tag', 'featured');
-        formData.append('public_ids[]', publicId);
-        formData.append('command', isFeatured ? 'add' : 'remove');
-        formData.append('upload_preset', UPLOAD_PRESET);
-        // Note: client-side tagging usually requires API key/secret signature or Admin API
-        // If this fails due to unsigned upload issues, we rely 100% on local storage for now.
 
         try {
-            const timestamp = Math.round(Date.now() / 1000);
-            const params = {
-                public_id: publicId,
-                tags: newTags.join(','), // Use the newTags for signature generation
-                timestamp: timestamp,
-                type: 'upload'
-            };
-            const signature = await generateSignature(params);
+            // Use Basic Auth since we have the secret (matches user's simple-setup preference)
+            const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
 
-            // The formData for the actual API call needs to be adjusted based on the new API endpoint
-            // The previous formData was for 'image/explicit', now it's 'resources/image/tags'
-            // Re-creating formData for the new endpoint
-            const apiFormData = new FormData();
-            apiFormData.append('public_ids[]', publicId);
-            apiFormData.append('tag', 'featured');
-            apiFormData.append('command', isFeatured ? 'add' : 'remove');
-            apiFormData.append('api_key', CLOUDINARY_API_KEY);
-            apiFormData.append('timestamp', timestamp);
-            apiFormData.append('signature', signature); // Signature for 'resources/image/tags' endpoint
-
-            const resp = await fetch(url, { // Use the new 'url' variable
+            const resp = await fetch(url, {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    tag: 'featured',
+                    public_ids: [publicId],
+                    command: isFeatured ? 'add' : 'remove'
+                })
             });
 
             if (!resp.ok) {
@@ -605,7 +638,7 @@ async function toggleFeatured(publicId, currentTags) {
                 throw new Error(err.error?.message || 'Failed to update');
             }
 
-            console.log(isFeatured ? 'Removed from Featured!' : 'Added to Featured!');
+            console.log(isFeatured ? 'Removed from Featured (Cloud)!' : 'Added to Featured (Cloud)!');
         } catch (error) {
             console.error('Toggle error:', error);
             alert('Toggle failed: ' + error.message);
