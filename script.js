@@ -98,17 +98,19 @@ function updateNavigation() {
                         await fetch(url, { method: 'POST', body: formData });
                     };
 
-                    // Process all featured
+                    // Process all in parallel for speed
+                    const promises = [];
+
                     for (const id of featuredIds) {
-                        await updateContext(id, true);
+                        promises.push(updateContext(id, true));
                     }
-
-                    // Process all unfeatured
                     for (const id of unfeaturedIds) {
-                        await updateContext(id, false);
+                        promises.push(updateContext(id, false));
                     }
 
-                    alert("Sync Complete! Context updated. Wait 30s and refresh public site.");
+                    await Promise.all(promises);
+
+                    alert("Sync Complete! 🚀\nNavigate to the public site and refresh.");
 
                 } catch (e) {
                     console.error("Sync failed", e);
