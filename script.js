@@ -74,16 +74,33 @@ function updateNavigation() {
 
                     const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/explicit`;
 
-                    // Helper to update context
-                    const updateContext = async (id, isFeatured) => {
+                    // Helper to update tags & context
+                    const updateResource = async (id, isFeatured) => {
+                        // Find current tags from memory
+                        const resource = allResources.find(r => r.public_id === id);
+                        let currentTags = resource ? (resource.tags || []) : [];
+
+                        // Safety: If we can't find resource, we skip tag update to avoid wiping data
+                        // But wait, if we skip, we don't fix the issue.
+                        // We must assume allResources is reasonably up to date.
+                        // Filter out 'featured' first
+                        currentTags = currentTags.filter(t => t !== 'featured');
+
+                        if (isFeatured) {
+                            currentTags.push('featured');
+                        }
+
+                        const newTagStr = currentTags.join(',');
                         const timestamp = Math.round(Date.now() / 1000);
                         const contextVal = isFeatured ? 'featured=true' : 'featured=false';
 
+                        // Params to sign
                         const paramsToSign = {
                             context: contextVal,
                             public_id: id,
+                            tags: newTagStr,
                             timestamp: timestamp,
-                            type: 'upload' // Explicit requires type='upload' context for signatures typically
+                            type: 'upload'
                         };
                         const signature = await generateSignature(paramsToSign);
 
@@ -91,6 +108,7 @@ function updateNavigation() {
                         formData.append('public_id', id);
                         formData.append('type', 'upload');
                         formData.append('context', contextVal);
+                        formData.append('tags', newTagStr); // Replaces tags with new list
                         formData.append('timestamp', timestamp);
                         formData.append('api_key', CLOUDINARY_API_KEY);
                         formData.append('signature', signature);
@@ -98,19 +116,19 @@ function updateNavigation() {
                         await fetch(url, { method: 'POST', body: formData });
                     };
 
-                    // Process all in parallel for speed
+                    // Process all in parallel
                     const promises = [];
 
                     for (const id of featuredIds) {
-                        promises.push(updateContext(id, true));
+                        promises.push(updateResource(id, true));
                     }
                     for (const id of unfeaturedIds) {
-                        promises.push(updateContext(id, false));
+                        promises.push(updateResource(id, false));
                     }
 
                     await Promise.all(promises);
 
-                    alert("Sync Complete! 🚀\nNavigate to the public site and refresh.");
+                    alert("Sync Complete! 🚀\nIMPORTANT: It may take 1-2 minutes for Cloudinary to update the 'featured.json' list.\nPlease wait a bit before refreshing public site.");
 
                 } catch (e) {
                     console.error("Sync failed", e);
