@@ -253,6 +253,20 @@ footer {
         flex-direction: column;
     }
 
+    /* Stack Header for Mobile - STICKY */
+    header {
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        position: sticky;
+        top: 0;
+        z-index: 1001;
+        background-color: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--color-border);
+    }
+
+
     .sidebar {
         width: 100%;
         border-right: none;
@@ -263,8 +277,12 @@ footer {
     }
 
     nav ul {
-        gap: var(--spacing-md);
+        gap: 0.75rem;
         font-size: 0.8rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
     }
 
     h1 {
