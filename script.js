@@ -209,16 +209,9 @@ async function renderGallery() {
         gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
     }
 
-    // Step 2: Fetch from Admin API (Real-time, no cache delay)
-    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?max_results=100&context=true&tags=true&direction=desc`;
-
+    // Step 2: Fetch from serverless API (Real-time, no CORS issues)
     try {
-        const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
-
-        const resp = await fetch(url, {
-            method: 'GET',
-            headers: { 'Authorization': authHeader }
-        });
+        const resp = await fetch('/api/images');
 
         if (!resp.ok) throw new Error('Failed to fetch resources');
 
@@ -840,19 +833,9 @@ async function loadNewArrivals() {
 // HELPER: Fetch all images from Cloudinary
 // =============================================
 async function fetchAllImages() {
-    // USE ADMIN API (Instant Updates) instead of List API (Cached)
-    // Authorization: Basic base64(API_KEY:API_SECRET)
-    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?max_results=100&context=true&tags=true&direction=desc`;
-
+    // USE SERVERLESS API (Real-time, no CORS issues)
     try {
-        const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
-
-        const resp = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Authorization': authHeader
-            }
-        });
+        const resp = await fetch('/api/images');
 
         if (!resp.ok) throw new Error('Failed to fetch resources');
 
