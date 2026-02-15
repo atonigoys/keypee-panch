@@ -380,9 +380,26 @@ function addGalleryCard(img, prepend) {
 
     const imageUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_300,h_300/${img.public_id}`;
     const context = img.context?.custom || {};
-    const category = context.category || 'Unknown';
-    const color = context.color || '';
     const currentTags = img.tags || [];
+
+    // Fallback: Infer category/color from tags if context is missing
+    const categories = ['Shirt', 'Poloshirt', 'Longsleeve', 'Sleeveless', 'Full Set Jersey', 'Jersey', 'Logo'];
+    const colors = ['Black', 'White', 'Blue', 'Red', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 'Cyan', 'Beige'];
+
+    let category = context.category;
+    let color = context.color;
+
+    if (!category || category === 'Unknown') {
+        const found = currentTags.find(t => categories.includes(t));
+        if (found) category = found;
+        else category = 'Unknown';
+    }
+
+    if (!color) {
+        const found = currentTags.find(t => colors.includes(t));
+        if (found) color = found;
+        else color = '';
+    }
     const isFeatured = currentTags.includes('featured');
 
     const el = document.createElement('div');
@@ -579,12 +596,40 @@ async function toggleFeatured(publicId, currentTags) {
                         currentTags.push('featured');
                     }
 
-                    // Update the local resource object immediately so subsequent clicks are accurate
+                    // Update valid tags
                     if (resource) resource.tags = currentTags;
-
                     const newTagStr = currentTags.join(',');
+
+                    // PRESERVE AND RECOVER CONTEXT
+                    let ctx = (resource && resource.context && resource.context.custom) ? { ...resource.context.custom } : {};
+
+                    // Update featured status
+                    ctx.featured = isFeatured ? 'true' : 'false';
+
+                    // Recover missing category/color from tags if needed
+                    if (!ctx.category || ctx.category === 'Unknown') {
+                        const categories = ['Shirt', 'Poloshirt', 'Longsleeve', 'Sleeveless', 'Full Set Jersey', 'Jersey', 'Logo'];
+                        const foundCat = currentTags.find(t => categories.includes(t));
+                        if (foundCat) ctx.category = foundCat;
+                    }
+                    if (!ctx.color) {
+                        const colors = ['Black', 'White', 'Blue', 'Red', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 'Cyan', 'Beige'];
+                        const foundColor = currentTags.find(t => colors.includes(t));
+                        if (foundColor) ctx.color = foundColor;
+                    }
+
+                    // Serialize context for API (k=v|k=v)
+                    const contextVal = Object.entries(ctx)
+                        .map(([k, v]) => `${k}=${v}`)
+                        .join('|');
+
+                    // Update local resource context immediately
+                    if (resource) {
+                        if (!resource.context) resource.context = { custom: {} };
+                        resource.context.custom = ctx;
+                    }
+
                     const timestamp = Math.round(Date.now() / 1000);
-                    const contextVal = isFeatured ? 'featured=true' : 'featured=false';
 
                     // Params to sign
                     const paramsToSign = {
