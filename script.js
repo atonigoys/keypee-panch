@@ -878,53 +878,58 @@ async function loadNewArrivals() {
 // HELPER: Fetch all images from Cloudinary
 // =============================================
 async function fetchAllImages() {
-    // Fetch from multiple tags to ensure we get everything (in case 'all' tag is lagging)
-    const tags = ['all', 'Shirt', 'Poloshirt', 'Longsleeve', 'Sleeveless', 'Full Set Jersey', 'Logo'];
+    // USE ADMIN API (Instant Updates) instead of List API (Cached)
+    // Authorization: Basic base64(API_KEY:API_SECRET)
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?max_results=100&context=true&tags=true&direction=desc`;
 
     try {
-        const fetches = tags.map(tag =>
-            fetch(`${CLOUDINARY_LIST_URL}/${encodeURIComponent(tag)}.json`)
-                .then(r => r.ok ? r.json() : { resources: [] })
-                .catch(() => ({ resources: [] }))
-        );
+        const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
 
-        const results = await Promise.all(fetches);
-
-        // Merge by public_id to remove duplicates
-        const merged = new Map();
-        results.forEach(data => {
-            (data.resources || []).forEach(img => {
-                // Determine context if missing (some list endpoints might not return context full details)
-                if (!merged.has(img.public_id)) {
-                    merged.set(img.public_id, img);
-                } else {
-                    // Merge tags
-                    const existing = merged.get(img.public_id);
-                    const allTags = new Set([...(existing.tags || []), ...(img.tags || [])]);
-                    existing.tags = [...allTags];
-                    // Merge context if newer has it
-                    if (img.context) {
-                        existing.context = { ...(existing.context || {}), ...(img.context || {}) };
-                    }
-                }
-            });
+        const resp = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': authHeader
+            }
         });
 
-        // 2. Overlay Local Cache (for instant updates for Admin)
+        if (!resp.ok) throw new Error('Failed to fetch resources');
+
+        const data = await resp.json();
+        const resources = data.resources || [];
+
+        // Map Admin API format -> App format
+        // Admin API returns tags as array, context as object { custom: { ... } }
+        // We need to ensure consistency.
+        const mappedResources = resources.map(img => {
+            // Context comes as { custom: { category: '...' } }
+            // Ensure tags is array
+            if (!img.tags) img.tags = [];
+
+            // Fix context if missing
+            if (!img.context) img.context = { custom: {} };
+            if (!img.context.custom) img.context.custom = {};
+
+            return img;
+        });
+
+        // 2. Overlay Local Cache (Optimistic UI for Admin) using a Map
+        const merged = new Map();
+        mappedResources.forEach(img => merged.set(img.public_id, img));
+
         try {
             const cached = JSON.parse(localStorage.getItem('kp_gallery_cache') || '[]');
             cached.forEach(img => {
-                // If it exists in cache, it's the latest version (tags, context, etc.)
-                // so we overwrite or add it.
-                if (img.public_id) {
-                    merged.set(img.public_id, img);
+                if (img.public_id && merged.has(img.public_id)) {
+                    // If local cache has newer context, respect it (optional)
+                    // But Admin API is the source of truth now.
+                    // Let's just trust Admin API primarily.
                 }
             });
         } catch (e) {
             console.warn("Failed to read local cache");
         }
 
-        // 3. OVERRIDE FEATURED STATUS (Optimistic UI) - Dual List
+        // 3. APPLY LOCAL OVERRIDES (Featured/Unfeatured) - Still useful for instant toggle feedback
         let featuredIds = [];
         let unfeaturedIds = [];
         try {
@@ -934,29 +939,20 @@ async function fetchAllImages() {
         const featuredSet = new Set(featuredIds);
         const unfeaturedSet = new Set(unfeaturedIds);
 
-        merged.forEach(img => {
+        mappedResources.forEach(img => {
             if (featuredSet.has(img.public_id)) {
                 // FORCE ON
-                if (!(img.tags || []).includes('featured')) {
-                    if (!img.tags) img.tags = [];
-                    img.tags.push('featured');
-                }
-                if (!img.context) img.context = { custom: {} };
-                if (!img.context.custom) img.context.custom = {};
+                if (!img.tags.includes('featured')) img.tags.push('featured');
                 img.context.custom.featured = 'true';
             } else if (unfeaturedSet.has(img.public_id)) {
                 // FORCE OFF
-                if ((img.tags || []).includes('featured')) {
-                    img.tags = img.tags.filter(t => t !== 'featured');
-                }
-                if (img.context?.custom?.featured === 'true') {
-                    img.context.custom.featured = 'false';
-                }
+                if (img.tags.includes('featured')) img.tags = img.tags.filter(t => t !== 'featured');
+                img.context.custom.featured = 'false';
             }
-            // ELSE: Trust Cloudinary (Do nothing)
         });
 
-        return [...merged.values()];
+        return mappedResources;
+
     } catch (error) {
         console.error("Failed to fetch all images:", error);
         return [];
