@@ -399,6 +399,13 @@ if (applyFiltersBtn) {
     });
 }
 
+const allProductsBtn = document.getElementById('all-products-btn');
+if (allProductsBtn) {
+    allProductsBtn.addEventListener('click', () => {
+        window.location.href = 'products.html';
+    });
+}
+
 // 7. Public: Render Results (Products Page)
 if (window.location.pathname.includes('products.html')) {
     initProductsPage();
