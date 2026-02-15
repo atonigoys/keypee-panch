@@ -231,12 +231,15 @@ async function renderGallery() {
             cached.forEach(item => localCacheMap.set(item.public_id, item));
         }
 
-        // --- LOAD FEATURED IDS (Generic Source of Truth) ---
+        // --- LOAD FEATURED/UNFEATURED IDS (Optimistic UI) ---
         let featuredIds = [];
+        let unfeaturedIds = [];
         try {
             featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
+            unfeaturedIds = JSON.parse(localStorage.getItem('kp_unfeatured_ids') || '[]');
         } catch (e) { }
         const featuredSet = new Set(featuredIds);
+        const unfeaturedSet = new Set(unfeaturedIds);
 
         // Merge all resources by unique public_id
         const merged = new Map();
@@ -261,19 +264,18 @@ async function renderGallery() {
                 img.context = localItem.context;
             }
 
-            // 2. OVERRIDE FEATURED STATUS based on kp_featured_ids
-            // This is the absolute truth for the UI.
+            // 2. OVERRIDE FEATURED STATUS (Optimistic)
             if (featuredSet.has(img.public_id)) {
+                // FORCE ON
                 if (!(img.tags || []).includes('featured')) {
                     if (!img.tags) img.tags = [];
                     img.tags.push('featured');
                 }
-                // Ensure context matches for consistency
                 if (!img.context) img.context = { custom: {} };
                 if (!img.context.custom) img.context.custom = {};
                 img.context.custom.featured = 'true';
-            } else {
-                // If NOT in featured list, remove tag if present
+            } else if (unfeaturedSet.has(img.public_id)) {
+                // FORCE OFF
                 if ((img.tags || []).includes('featured')) {
                     img.tags = img.tags.filter(t => t !== 'featured');
                 }
@@ -281,6 +283,7 @@ async function renderGallery() {
                     img.context.custom.featured = 'false';
                 }
             }
+            // ELSE: Trust Cloudinary (Do nothing)
         });
 
         const cloudResources = [...merged.values()];
@@ -479,24 +482,52 @@ async function toggleFeatured(publicId, currentTags) {
     const resIdx = allResources.findIndex(r => r.public_id === publicId);
 
     if (resIdx !== -1) {
-        // --- NEW LOGIC: Use dedicated local list as source of truth ---
+        // --- NEW LOGIC: Dual List Source of Truth (Featured vs Unfeatured) ---
         let featuredIds = [];
+        let unfeaturedIds = [];
         try {
             featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
+            unfeaturedIds = JSON.parse(localStorage.getItem('kp_unfeatured_ids') || '[]');
         } catch (e) {
-            console.warn('Failed to parse featured ids', e);
+            console.warn('Failed to parse local lists', e);
         }
 
-        const wasFeatured = featuredIds.includes(publicId);
-        const isFeatured = !wasFeatured; // Toggle
+        // Determine current effective state (Local Override > Cloud)
+        // Note: We need to know if cloud *thinks* it is featured
+        // But for toggle, we just invert the current *known* state.
+        // If we rely on `isFeatured` passed in or derived?
+        // Let's derive it from effective state logic to be safe:
+        const isCloudFeatured = currentTags.includes('featured');
+        const isLocallyFeatured = featuredIds.includes(publicId);
+        const isLocallyUnfeatured = unfeaturedIds.includes(publicId);
 
+        // Effective state:
+        // If in featured list -> TRUE
+        // If in unfeatured list -> FALSE
+        // Else -> Cloud state
+        let effectiveState = isCloudFeatured;
+        if (isLocallyFeatured) effectiveState = true;
+        if (isLocallyUnfeatured) effectiveState = false;
+
+        const isFeatured = !effectiveState; // New Desired State
+
+        // Update Local Lists
         if (isFeatured) {
+            // User wants to FEATURE it.
+            // Add to featured list (to force it ON locally)
             if (!featuredIds.includes(publicId)) featuredIds.push(publicId);
+            // Remove from unfeatured list (if it was forced OFF)
+            unfeaturedIds = unfeaturedIds.filter(id => id !== publicId);
         } else {
+            // User wants to UNFEATURE it.
+            // Add to unfeatured list (to force it OFF locally)
+            if (!unfeaturedIds.includes(publicId)) unfeaturedIds.push(publicId);
+            // Remove from featured list (if it was forced ON)
             featuredIds = featuredIds.filter(id => id !== publicId);
         }
 
         localStorage.setItem('kp_featured_ids', JSON.stringify(featuredIds));
+        localStorage.setItem('kp_unfeatured_ids', JSON.stringify(unfeaturedIds));
 
         // Update Cloudinary in background (Eventual Consistency)
         let newTags = [...currentTags];
@@ -772,15 +803,19 @@ async function fetchAllImages() {
             console.warn("Failed to read local cache");
         }
 
-        // 3. OVERRIDE FEATURED STATUS based on kp_featured_ids
+        // 3. OVERRIDE FEATURED STATUS (Optimistic UI) - Dual List
         let featuredIds = [];
+        let unfeaturedIds = [];
         try {
             featuredIds = JSON.parse(localStorage.getItem('kp_featured_ids') || '[]');
+            unfeaturedIds = JSON.parse(localStorage.getItem('kp_unfeatured_ids') || '[]');
         } catch (e) { }
         const featuredSet = new Set(featuredIds);
+        const unfeaturedSet = new Set(unfeaturedIds);
 
         merged.forEach(img => {
             if (featuredSet.has(img.public_id)) {
+                // FORCE ON
                 if (!(img.tags || []).includes('featured')) {
                     if (!img.tags) img.tags = [];
                     img.tags.push('featured');
@@ -788,7 +823,8 @@ async function fetchAllImages() {
                 if (!img.context) img.context = { custom: {} };
                 if (!img.context.custom) img.context.custom = {};
                 img.context.custom.featured = 'true';
-            } else {
+            } else if (unfeaturedSet.has(img.public_id)) {
+                // FORCE OFF
                 if ((img.tags || []).includes('featured')) {
                     img.tags = img.tags.filter(t => t !== 'featured');
                 }
@@ -796,6 +832,7 @@ async function fetchAllImages() {
                     img.context.custom.featured = 'false';
                 }
             }
+            // ELSE: Trust Cloudinary (Do nothing)
         });
 
         return [...merged.values()];
