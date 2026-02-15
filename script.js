@@ -139,14 +139,27 @@ if (uploadForm) {
                 body: formData
             });
 
-            if (!resp.ok) {
-                const errData = await resp.json();
-                throw new Error(errData.error?.message || "Upload failed");
-            }
+            const cloudData = await resp.json();
 
             alert("Upload Successful!");
             uploadForm.reset();
-            renderGallery();
+
+            // Instantly add to gallery (no 60s wait!)
+            if (gallery) {
+                // Remove "no images" placeholder if present
+                const placeholder = gallery.querySelector('p');
+                if (placeholder && placeholder.textContent.includes('No images')) {
+                    gallery.innerHTML = '';
+                }
+
+                const newImg = {
+                    public_id: cloudData.public_id,
+                    tags: cloudData.tags || [],
+                    context: { custom: { category, color, featured: String(isFeatured) } },
+                    created_at: cloudData.created_at
+                };
+                addGalleryCard(newImg, true); // prepend
+            }
 
         } catch (error) {
             console.error("Upload error:", error);
@@ -187,42 +200,7 @@ async function renderGallery() {
         resources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         gallery.innerHTML = '';
-        resources.forEach(img => {
-            const imageUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_300,h_300/${img.public_id}`;
-            const context = img.context?.custom || {};
-            const category = context.category || 'Unknown';
-            const color = context.color || '';
-            const currentTags = img.tags || [];
-            const isFeatured = currentTags.includes('featured');
-            const tagsJson = JSON.stringify(currentTags).replace(/'/g, "\\'");
-
-            const el = document.createElement('div');
-            el.style.cssText = 'position: relative; border: 1px solid var(--color-text-secondary); border-radius: 8px; overflow: hidden;';
-            el.innerHTML = `
-                <img src="${imageUrl}" alt="${category}" style="width: 100%; height: 150px; object-fit: cover; display: block;">
-                <div style="padding: 0.5rem;">
-                    <p style="margin: 0; font-weight: bold; font-size: 0.85rem;">${category}</p>
-                    <p style="margin: 0; font-size: 0.75rem; color: var(--color-text-secondary);">${color}</p>
-                    ${isFeatured ? '<span style="font-size: 0.7rem; color: gold;">⭐ Featured</span>' : '<span style="font-size: 0.7rem; color: var(--color-text-secondary);">Not Featured</span>'}
-                </div>
-                <div style="display: flex; gap: 0.25rem; padding: 0 0.5rem 0.5rem;">
-                    <button class="toggle-btn"
-                        style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid ${isFeatured ? '#ff4444' : 'gold'}; background: ${isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)'}; color: ${isFeatured ? '#ff4444' : 'gold'}; border-radius: 4px;">
-                        ${isFeatured ? '★ Unfeature' : '☆ Feature'}
-                    </button>
-                    <button class="delete-btn"
-                        style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid #ff4444; background: rgba(255,68,68,0.2); color: #ff4444; border-radius: 4px;">
-                        🗑 Delete
-                    </button>
-                </div>
-            `;
-
-            // Attach event listeners (avoids inline onclick issues with special chars)
-            el.querySelector('.toggle-btn').addEventListener('click', () => toggleFeatured(img.public_id, currentTags));
-            el.querySelector('.delete-btn').addEventListener('click', () => deleteImage(img.public_id));
-
-            gallery.appendChild(el);
-        });
+        resources.forEach(img => addGalleryCard(img, false));
 
     } catch (error) {
         console.error("Gallery error:", error);
@@ -231,10 +209,62 @@ async function renderGallery() {
 }
 
 // =============================================
-// 3b. ADMIN: Delete Image
+// 3a-helper. Create a gallery card element
+// =============================================
+function addGalleryCard(img, prepend) {
+    if (!gallery) return;
+
+    const imageUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_300,h_300/${img.public_id}`;
+    const context = img.context?.custom || {};
+    const category = context.category || 'Unknown';
+    const color = context.color || '';
+    const currentTags = img.tags || [];
+    const isFeatured = currentTags.includes('featured');
+
+    const el = document.createElement('div');
+    el.dataset.publicId = img.public_id;
+    el.style.cssText = 'position: relative; border: 1px solid var(--color-text-secondary); border-radius: 8px; overflow: hidden;';
+    el.innerHTML = `
+        <img src="${imageUrl}" alt="${category}" style="width: 100%; height: 150px; object-fit: cover; display: block;">
+        <div style="padding: 0.5rem;">
+            <p style="margin: 0; font-weight: bold; font-size: 0.85rem;">${category}</p>
+            <p style="margin: 0; font-size: 0.75rem; color: var(--color-text-secondary);">${color}</p>
+            ${isFeatured ? '<span style="font-size: 0.7rem; color: gold;">⭐ Featured</span>' : '<span style="font-size: 0.7rem; color: var(--color-text-secondary);">Not Featured</span>'}
+        </div>
+        <div style="display: flex; gap: 0.25rem; padding: 0 0.5rem 0.5rem;">
+            <button class="toggle-btn"
+                style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid ${isFeatured ? '#ff4444' : 'gold'}; background: ${isFeatured ? 'rgba(255,68,68,0.2)' : 'rgba(255,215,0,0.2)'}; color: ${isFeatured ? '#ff4444' : 'gold'}; border-radius: 4px;">
+                ${isFeatured ? '★ Unfeature' : '☆ Feature'}
+            </button>
+            <button class="delete-btn"
+                style="flex: 1; padding: 0.3rem; font-size: 0.7rem; cursor: pointer; border: 1px solid #ff4444; background: rgba(255,68,68,0.2); color: #ff4444; border-radius: 4px;">
+                🗑 Delete
+            </button>
+        </div>
+    `;
+
+    el.querySelector('.toggle-btn').addEventListener('click', () => toggleFeatured(img.public_id, currentTags));
+    el.querySelector('.delete-btn').addEventListener('click', () => deleteImage(img.public_id));
+
+    if (prepend) {
+        gallery.prepend(el);
+    } else {
+        gallery.appendChild(el);
+    }
+}
+
+// =============================================
+// 3b. ADMIN: Delete Image (Instant)
 // =============================================
 async function deleteImage(publicId) {
     if (!confirm(`Delete this image?\nThis cannot be undone.`)) return;
+
+    // Instantly remove from DOM
+    const card = gallery?.querySelector(`[data-public-id="${publicId}"]`);
+    if (card) card.remove();
+    if (gallery && gallery.children.length === 0) {
+        gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">No images uploaded yet.</p>';
+    }
 
     try {
         const timestamp = Math.round(Date.now() / 1000);
@@ -252,25 +282,21 @@ async function deleteImage(publicId) {
         });
 
         const result = await resp.json();
-        if (result.result === "ok") {
-            alert("Image deleted!");
-            renderGallery();
-        } else {
+        if (result.result !== "ok") {
             throw new Error(result.result || "Delete failed");
         }
     } catch (error) {
         console.error("Delete error:", error);
         alert("Delete failed: " + error.message);
+        renderGallery(); // Re-render on failure to restore
     }
 }
 
 // =============================================
-// 3c. ADMIN: Toggle Featured (via /image/explicit)
+// 3c. ADMIN: Toggle Featured (Instant)
 // =============================================
 async function toggleFeatured(publicId, currentTags) {
     const isFeatured = currentTags.includes('featured');
-
-    // Build new tags list
     let newTags;
     if (isFeatured) {
         newTags = currentTags.filter(t => t !== 'featured');
@@ -278,6 +304,35 @@ async function toggleFeatured(publicId, currentTags) {
         newTags = [...currentTags, 'featured'];
     }
     const tagsString = newTags.join(',');
+
+    // Instantly update the card in DOM
+    const card = gallery?.querySelector(`[data-public-id="${publicId}"]`);
+    if (card) {
+        const newImg = {
+            public_id: publicId,
+            tags: newTags,
+            context: { custom: {} }
+        };
+        // Copy existing context from card text
+        const catEl = card.querySelector('p:first-child');
+        const colorEl = card.querySelector('p:nth-child(2)');
+        if (catEl) newImg.context.custom.category = catEl.textContent;
+        if (colorEl) newImg.context.custom.color = colorEl.textContent;
+
+        const parent = card.parentNode;
+        const next = card.nextSibling;
+        card.remove();
+
+        // Create updated card in same position
+        const tempDiv = document.createElement('div');
+        gallery.appendChild(tempDiv); // temp to get the card
+        addGalleryCard(newImg, false);
+        const newCard = gallery.lastChild;
+        gallery.removeChild(tempDiv);
+        if (next) {
+            parent.insertBefore(newCard, next);
+        }
+    }
 
     try {
         const timestamp = Math.round(Date.now() / 1000);
