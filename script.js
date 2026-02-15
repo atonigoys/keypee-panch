@@ -61,6 +61,7 @@ function updateNavigation(user) {
         logoutBtn.innerText = "Logout";
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            if (!confirm("Are you sure you want to log out?")) return;
             signOut(auth).then(() => {
                 window.location.href = 'index.html';
             }).catch((error) => {
