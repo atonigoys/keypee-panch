@@ -207,22 +207,47 @@ async function renderGallery() {
         gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
     }
 
-    // Step 2: Sync from Cloudinary list endpoint + merge with local cache
-    try {
-        const resp = await fetch(`${CLOUDINARY_LIST_URL}/all.json`);
-        if (resp.ok) {
-            const data = await resp.json();
-            const cloudResources = data.resources || [];
+    // Step 2: Fetch ALL tag lists in parallel and merge by public_id
+    const tagNames = [
+        'all', 'featured',
+        'Shirt', 'Poloshirt', 'Longsleeve', 'Sleeveless', 'Full Set Jersey', 'Logo',
+        'Black', 'White', 'Blue', 'Red', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 'Cyan', 'Beige'
+    ];
 
-            // Merge: start with cloud data, add any locally-cached items not yet in cloud list
-            const cloudIds = new Set(cloudResources.map(r => r.public_id));
-            const localOnly = (cached || []).filter(r => !cloudIds.has(r.public_id));
-            allResources = [...localOnly, ...cloudResources];
-            allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            saveGalleryCache();
-            applyGalleryFilter();
-        }
-        // If 404 or error, just keep showing cached data
+    try {
+        const fetches = tagNames.map(tag =>
+            fetch(`${CLOUDINARY_LIST_URL}/${encodeURIComponent(tag)}.json`)
+                .then(r => r.ok ? r.json() : { resources: [] })
+                .catch(() => ({ resources: [] }))
+        );
+
+        const results = await Promise.all(fetches);
+
+        // Merge all resources by unique public_id
+        const merged = new Map();
+        results.forEach(data => {
+            (data.resources || []).forEach(img => {
+                if (!merged.has(img.public_id)) {
+                    merged.set(img.public_id, img);
+                } else {
+                    // Merge tags from different list responses
+                    const existing = merged.get(img.public_id);
+                    const allTags = new Set([...(existing.tags || []), ...(img.tags || [])]);
+                    existing.tags = [...allTags];
+                }
+            });
+        });
+
+        const cloudResources = [...merged.values()];
+
+        // Also keep any locally-cached items not yet in any cloud list
+        const cloudIds = new Set(cloudResources.map(r => r.public_id));
+        const localOnly = (cached || []).filter(r => !cloudIds.has(r.public_id));
+        allResources = [...localOnly, ...cloudResources];
+        allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        saveGalleryCache();
+        applyGalleryFilter();
+
     } catch (error) {
         console.error("Gallery sync error:", error);
     }
