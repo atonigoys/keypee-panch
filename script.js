@@ -235,6 +235,12 @@ function applyGalleryFilter() {
     let filtered = allResources;
     if (currentFilter === 'featured') {
         filtered = allResources.filter(img => (img.tags || []).includes('featured'));
+    } else if (currentFilter.startsWith('cat:')) {
+        const cat = currentFilter.replace('cat:', '');
+        filtered = allResources.filter(img => {
+            const context = img.context?.custom || {};
+            return context.category === cat;
+        });
     }
 
     // Update image count
@@ -244,9 +250,10 @@ function applyGalleryFilter() {
     }
 
     if (filtered.length === 0) {
-        gallery.innerHTML = `<p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">
-            ${currentFilter === 'featured' ? 'No featured images yet.' : 'No images uploaded yet. Upload your first design!'}
-        </p>`;
+        let msg = 'No images uploaded yet. Upload your first design!';
+        if (currentFilter === 'featured') msg = 'No featured images yet.';
+        else if (currentFilter.startsWith('cat:')) msg = `No ${currentFilter.replace('cat:', '')} images yet.`;
+        gallery.innerHTML = `<p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">${msg}</p>`;
         return;
     }
 
@@ -259,13 +266,30 @@ document.querySelectorAll('.gallery-filter').forEach(btn => {
     btn.addEventListener('click', () => {
         currentFilter = btn.dataset.filter;
 
-        // Update active styles
+        // Reset all buttons
         document.querySelectorAll('.gallery-filter').forEach(b => {
             b.style.background = 'transparent';
-            b.style.color = b.dataset.filter === 'featured' ? 'gold' : 'var(--color-text-primary)';
+            if (b.dataset.filter === 'featured') {
+                b.style.color = 'gold';
+                b.style.borderColor = 'gold';
+            } else if (b.dataset.filter === 'all') {
+                b.style.color = 'var(--color-text-primary)';
+                b.style.borderColor = 'var(--color-text-primary)';
+            } else {
+                b.style.color = 'var(--color-text-secondary)';
+                b.style.borderColor = 'var(--color-text-secondary)';
+            }
         });
-        btn.style.background = btn.dataset.filter === 'featured' ? 'gold' : 'var(--color-text-primary)';
-        btn.style.color = 'var(--color-bg)';
+
+        // Highlight active button
+        if (btn.dataset.filter === 'featured') {
+            btn.style.background = 'gold';
+            btn.style.color = 'var(--color-bg)';
+        } else {
+            btn.style.background = 'var(--color-text-primary)';
+            btn.style.color = 'var(--color-bg)';
+            btn.style.borderColor = 'var(--color-text-primary)';
+        }
 
         applyGalleryFilter();
     });
