@@ -200,7 +200,7 @@ function loadGalleryCache() {
 async function renderGallery() {
     if (!gallery) return;
 
-    // Step 1: Show cached data INSTANTLY
+    // Step 1: Show cached data INSTANTLY (while API loads)
     const cached = loadGalleryCache();
     if (cached && cached.length > 0) {
         allResources = cached;
@@ -209,31 +209,30 @@ async function renderGallery() {
         gallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading...</p>';
     }
 
-    // Step 2: Fetch ALL tag lists in parallel and merge by public_id
-    const tagNames = [
-        'all', 'featured',
-        'Shirt', 'Poloshirt', 'Longsleeve', 'Sleeveless', 'Full Set Jersey', 'Logo',
-        'Black', 'White', 'Blue', 'Red', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 'Cyan', 'Beige'
-    ];
-
-    const timestamp = new Date().getTime();
+    // Step 2: Fetch from Admin API (Real-time, no cache delay)
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image?max_results=100&context=true&tags=true&direction=desc`;
 
     try {
-        const fetches = tagNames.map(tag =>
-            fetch(`${CLOUDINARY_LIST_URL}/${encodeURIComponent(tag)}.json?t=${timestamp}`)
-                .then(r => r.ok ? r.json() : { resources: [] })
-                .catch(() => ({ resources: [] }))
-        );
+        const authHeader = 'Basic ' + btoa(CLOUDINARY_API_KEY + ':' + CLOUDINARY_API_SECRET);
 
-        const results = await Promise.all(fetches);
+        const resp = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': authHeader }
+        });
 
-        // Create a map of the local cache for quick lookup
-        const localCacheMap = new Map();
-        if (cached && cached.length > 0) {
-            cached.forEach(item => localCacheMap.set(item.public_id, item));
-        }
+        if (!resp.ok) throw new Error('Failed to fetch resources');
 
-        // --- LOAD FEATURED/UNFEATURED IDS (Optimistic UI) ---
+        const data = await resp.json();
+        const resources = data.resources || [];
+
+        // Normalize context/tags
+        resources.forEach(img => {
+            if (!img.tags) img.tags = [];
+            if (!img.context) img.context = { custom: {} };
+            if (!img.context.custom) img.context.custom = {};
+        });
+
+        // --- LOAD LOCAL OVERRIDES (Optimistic UI) ---
         let featuredIds = [];
         let unfeaturedIds = [];
         try {
@@ -243,61 +242,24 @@ async function renderGallery() {
         const featuredSet = new Set(featuredIds);
         const unfeaturedSet = new Set(unfeaturedIds);
 
-        // Merge all resources by unique public_id
-        const merged = new Map();
-        results.forEach(data => {
-            (data.resources || []).forEach(img => {
-                if (!merged.has(img.public_id)) {
-                    merged.set(img.public_id, img);
-                } else {
-                    // Merge tags from different list responses
-                    const existing = merged.get(img.public_id);
-                    const allTags = new Set([...(existing.tags || []), ...(img.tags || [])]);
-                    existing.tags = [...allTags];
-                }
-            });
-        });
-
-        // Apply local overrides
-        merged.forEach(img => {
-            // 1. Apply cache overrides (context, etc.)
-            const localItem = localCacheMap.get(img.public_id);
-            if (localItem && localItem.context) {
-                img.context = localItem.context;
-            }
-
-            // 2. OVERRIDE FEATURED STATUS (Optimistic)
+        resources.forEach(img => {
             if (featuredSet.has(img.public_id)) {
-                // FORCE ON
-                if (!(img.tags || []).includes('featured')) {
-                    if (!img.tags) img.tags = [];
-                    img.tags.push('featured');
-                }
-                if (!img.context) img.context = { custom: {} };
-                if (!img.context.custom) img.context.custom = {};
+                if (!img.tags.includes('featured')) img.tags.push('featured');
                 img.context.custom.featured = 'true';
             } else if (unfeaturedSet.has(img.public_id)) {
-                // FORCE OFF
-                if ((img.tags || []).includes('featured')) {
-                    img.tags = img.tags.filter(t => t !== 'featured');
-                }
-                if (img.context?.custom?.featured === 'true') {
-                    img.context.custom.featured = 'false';
-                }
+                img.tags = img.tags.filter(t => t !== 'featured');
+                img.context.custom.featured = 'false';
             }
-            // ELSE: Trust Cloudinary (Do nothing)
         });
 
-        const cloudResources = [...merged.values()];
-
-        // Also keep any locally-cached items not yet in any cloud list
-        const cloudIds = new Set(cloudResources.map(r => r.public_id));
+        // Keep locally-uploaded items not yet in API response
+        const cloudIds = new Set(resources.map(r => r.public_id));
         const localOnly = (cached || []).filter(r => !cloudIds.has(r.public_id));
 
-        allResources = [...localOnly, ...cloudResources];
+        allResources = [...localOnly, ...resources];
         allResources.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-        saveGalleryCache(); // Save the merged correctness back to cache
+        saveGalleryCache();
         applyGalleryFilter();
 
     } catch (error) {
