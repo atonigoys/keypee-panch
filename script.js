@@ -382,23 +382,56 @@ function addGalleryCard(img, prepend) {
     const context = img.context?.custom || {};
     const currentTags = img.tags || [];
 
-    // Fallback: Infer category/color from tags if context is missing
-    const categories = ['Shirt', 'Poloshirt', 'Longsleeve', 'Sleeveless', 'Full Set Jersey', 'Jersey', 'Logo'];
-    const colors = ['Black', 'White', 'Blue', 'Red', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 'Cyan', 'Beige'];
+    // Fallback: Infer category/color from tags OR filename if context is missing
+    // Helper Maps for case-insensitive matching
+    const catMap = {
+        'shirt': 'Shirt', 'poloshirt': 'Poloshirt', 'polo': 'Poloshirt',
+        'longsleeve': 'Longsleeve', 'sleeveless': 'Sleeveless',
+        'jersey': 'Jersey', 'full set': 'Full Set Jersey', 'logo': 'Logo'
+    };
+    const colorMap = {
+        'black': 'Black', 'white': 'White', 'blue': 'Blue', 'red': 'Red',
+        'green': 'Green', 'yellow': 'Yellow', 'orange': 'Orange',
+        'purple': 'Purple', 'pink': 'Pink', 'cyan': 'Cyan', 'beige': 'Beige'
+    };
 
     let category = context.category;
     let color = context.color;
 
+    // 1. Infer Category
     if (!category || category === 'Unknown') {
-        const found = currentTags.find(t => categories.includes(t));
-        if (found) category = found;
-        else category = 'Unknown';
+        // Try case-insensitive tag map
+        const lowerTags = currentTags.map(t => t.toLowerCase());
+        for (const [key, val] of Object.entries(catMap)) {
+            if (lowerTags.includes(key)) { category = val; break; }
+        }
+
+        // Try filename (public_id) keywords
+        if ((!category || category === 'Unknown') && img.public_id) {
+            const filename = img.public_id.split('/').pop().toLowerCase();
+            for (const [key, val] of Object.entries(catMap)) {
+                if (filename.includes(key)) { category = val; break; }
+            }
+        }
+        category = category || 'Unknown';
     }
 
+    // 2. Infer Color
     if (!color) {
-        const found = currentTags.find(t => colors.includes(t));
-        if (found) color = found;
-        else color = '';
+        // Try case-insensitive tag map
+        const lowerTags = currentTags.map(t => t.toLowerCase());
+        for (const [key, val] of Object.entries(colorMap)) {
+            if (lowerTags.includes(key)) { color = val; break; }
+        }
+
+        // Try filename keywords for color
+        if (!color && img.public_id) {
+            const filename = img.public_id.split('/').pop().toLowerCase();
+            for (const [key, val] of Object.entries(colorMap)) {
+                if (filename.includes(key)) { color = val; break; }
+            }
+        }
+        color = color || '';
     }
     const isFeatured = currentTags.includes('featured');
 
@@ -607,15 +640,46 @@ async function toggleFeatured(publicId, currentTags) {
                     ctx.featured = isFeatured ? 'true' : 'false';
 
                     // Recover missing category/color from tags if needed
+                    const catMap = {
+                        'shirt': 'Shirt', 'poloshirt': 'Poloshirt', 'polo': 'Poloshirt',
+                        'longsleeve': 'Longsleeve', 'sleeveless': 'Sleeveless',
+                        'jersey': 'Jersey', 'full set': 'Full Set Jersey', 'logo': 'Logo'
+                    };
+                    const colorMap = {
+                        'black': 'Black', 'white': 'White', 'blue': 'Blue', 'red': 'Red',
+                        'green': 'Green', 'yellow': 'Yellow', 'orange': 'Orange',
+                        'purple': 'Purple', 'pink': 'Pink', 'cyan': 'Cyan', 'beige': 'Beige'
+                    };
+
+                    // 1. Recover Category
                     if (!ctx.category || ctx.category === 'Unknown') {
-                        const categories = ['Shirt', 'Poloshirt', 'Longsleeve', 'Sleeveless', 'Full Set Jersey', 'Jersey', 'Logo'];
-                        const foundCat = currentTags.find(t => categories.includes(t));
-                        if (foundCat) ctx.category = foundCat;
+                        // Try case-insensitive tag map
+                        const lowerTags = currentTags.map(t => t.toLowerCase());
+                        for (const [key, val] of Object.entries(catMap)) {
+                            if (lowerTags.includes(key)) { ctx.category = val; break; }
+                        }
+                        // Try filename
+                        if ((!ctx.category || ctx.category === 'Unknown') && publicId) {
+                            const filename = publicId.split('/').pop().toLowerCase();
+                            for (const [key, val] of Object.entries(catMap)) {
+                                if (filename.includes(key)) { ctx.category = val; break; }
+                            }
+                        }
                     }
+
+                    // 2. Recover Color
                     if (!ctx.color) {
-                        const colors = ['Black', 'White', 'Blue', 'Red', 'Green', 'Yellow', 'Orange', 'Purple', 'Pink', 'Cyan', 'Beige'];
-                        const foundColor = currentTags.find(t => colors.includes(t));
-                        if (foundColor) ctx.color = foundColor;
+                        const lowerTags = currentTags.map(t => t.toLowerCase());
+                        for (const [key, val] of Object.entries(colorMap)) {
+                            if (lowerTags.includes(key)) { ctx.color = val; break; }
+                        }
+                        // Try filename
+                        if (!ctx.color && publicId) {
+                            const filename = publicId.split('/').pop().toLowerCase();
+                            for (const [key, val] of Object.entries(colorMap)) {
+                                if (filename.includes(key)) { ctx.color = val; break; }
+                            }
+                        }
                     }
 
                     // Serialize context for API (k=v|k=v)
