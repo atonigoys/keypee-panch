@@ -22,8 +22,17 @@
     </header>
 
     <main>
+        <!-- Mobile Filter Toggle -->
+        <button id="mobile-filter-toggle" class="btn" style="display: none; margin: 1rem; width: calc(100% - 2rem);">
+            🔍 Filter Products
+        </button>
+
         <!-- Sticky Product Filter Panel -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="product-sidebar">
+            <button id="close-sidebar"
+                style="display: none; width: 100%; margin-bottom: 1rem; background: #333; color: white; border: 1px solid #444; padding: 0.5rem; cursor: pointer;">
+                ✕ Close Filters
+            </button>
             <div class="filter-group">
                 <h3>Colors</h3>
                 <label class="filter-option"><input type="checkbox" value="Black" data-filter-type="color">

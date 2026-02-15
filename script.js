@@ -962,3 +962,47 @@ async function fetchAllImages() {
         return [];
     }
 }
+// =============================================
+// 7. MOBILE: Filter Sidebar Toggle
+// =============================================
+const mobileFilterBtn = document.getElementById('mobile-filter-toggle');
+const sidebar = document.querySelector('.sidebar'); // or #product-sidebar
+const closeSidebarBtn = document.getElementById('close-sidebar');
+
+if (mobileFilterBtn && sidebar) {
+    mobileFilterBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sidebar.classList.add('active');
+    });
+}
+
+if (closeSidebarBtn && sidebar) {
+    closeSidebarBtn.addEventListener('click', () => {
+        sidebar.classList.remove('active');
+    });
+}
+
+// Close sidebar when "Apply Filters" or "All Products" is clicked (Mobile UX)
+const applyBtnMobile = document.getElementById('apply-filters');
+const allProdsBtnMobile = document.getElementById('all-products-btn');
+
+if (applyBtnMobile && sidebar) {
+    applyBtnMobile.addEventListener('click', () => {
+        if (window.innerWidth <= 768) sidebar.classList.remove('active');
+    });
+}
+
+if (allProdsBtnMobile && sidebar) {
+    allProdsBtnMobile.addEventListener('click', () => {
+        if (window.innerWidth <= 768) sidebar.classList.remove('active');
+    });
+}
+
+// Close when clicking outside (on the body/overlay)
+document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('active')) {
+        if (!sidebar.contains(e.target) && e.target !== mobileFilterBtn) {
+            sidebar.classList.remove('active');
+        }
+    }
+});
