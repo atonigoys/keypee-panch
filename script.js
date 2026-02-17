@@ -1164,3 +1164,40 @@ document.addEventListener('click', (e) => {
         }
     }
 });
+
+
+// =============================================
+// 7. Global: Load Site Background
+// =============================================
+async function loadSiteBackground() {
+    try {
+        // 1. Try Local Storage Cache first (Fastest)
+        const storedBg = localStorage.getItem('kp_active_bg_url');
+        if (storedBg) {
+            document.body.style.backgroundImage = `url('${storedBg}')`;
+        }
+
+        // 2. Fetch fresh data to validate
+        const resp = await fetch('/api/images');
+        const data = await resp.json();
+        const resources = data.resources || [];
+
+        // Find active
+        const active = resources.find(img => (img.tags || []).includes('active_bg'));
+
+        if (active) {
+            const bgUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/q_auto:good/${active.public_id}`;
+            // Update if different
+            if (bgUrl !== storedBg) {
+                document.body.style.backgroundImage = `url('${bgUrl}')`;
+                localStorage.setItem('kp_active_bg_url', bgUrl);
+            }
+        } else {
+            document.body.style.backgroundImage = 'none';
+            localStorage.removeItem('kp_active_bg_url');
+        }
+
+    } catch (e) {
+        console.error("BG Load Error:", e);
+    }
+}
