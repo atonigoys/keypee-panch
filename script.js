@@ -44,6 +44,10 @@ if (isAdminPage && !isLoggedIn()) {
     window.location.href = '../login.html';
 }
 
+// Initialize Background globally
+loadSiteBackground();
+
+
 // Show admin content if logged in
 if (isAdminPage && isLoggedIn()) {
     const wrapper = document.getElementById('admin-page-wrapper');
@@ -53,6 +57,7 @@ if (isAdminPage && isLoggedIn()) {
 
 // Update navigation
 updateNavigation();
+
 
 function updateNavigation() {
     const navList = document.querySelector('nav ul');
@@ -171,6 +176,58 @@ if (uploadForm) {
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerText = "Upload Design";
+        }
+    });
+}
+
+// =============================================
+// 2b. ADMIN: Upload Background Logic
+// =============================================
+const uploadBgForm = document.getElementById('upload-bg-form');
+if (uploadBgForm) {
+    uploadBgForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const file = document.getElementById('upload-bg-file').files[0];
+        const submitBtn = uploadBgForm.querySelector('button[type="submit"]');
+
+        if (!file) {
+            alert("Please select an image file.");
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Uploading Background...";
+
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", UPLOAD_PRESET);
+
+            // Tags: "all", "Background"
+            // Context: category=Background
+            formData.append("tags", "all,Background");
+            formData.append("context", "category=Background");
+
+            const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+                method: "POST",
+                body: formData
+            });
+
+            const cloudData = await resp.json();
+
+            alert("Background Upload Successful!");
+            uploadBgForm.reset();
+
+            // Refresh Background Gallery
+            if (typeof renderBackgroundGallery === 'function') renderBackgroundGallery();
+
+        } catch (error) {
+            console.error("Upload error:", error);
+            alert("Upload failed: " + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Upload Background Image";
         }
     });
 }
@@ -692,6 +749,162 @@ async function toggleFeatured(publicId, currentTags) {
 }
 
 // =============================================
+// 3d. ADMIN: Render Background Gallery
+// =============================================
+async function renderBackgroundGallery() {
+    const bgGallery = document.getElementById('background-gallery');
+    if (!bgGallery) return;
+
+    bgGallery.innerHTML = '<p style="color: var(--color-text-secondary); font-style: italic;">Loading backgrounds...</p>';
+
+    // Ensure resources are loaded
+    if (allResources.length === 0) {
+        await renderGallery();
+    }
+
+    // Filter for Backgrounds
+    const backgrounds = allResources.filter(img => {
+        const cat = img.context?.custom?.category;
+        return cat === 'Background' || (img.tags || []).includes('Background');
+    });
+
+    if (backgrounds.length === 0) {
+        bgGallery.innerHTML = '<p style="grid-column: 1/-1; color: var(--color-text-secondary);">No background images found. Upload one above!</p>';
+        return;
+    }
+
+    bgGallery.innerHTML = '';
+
+    // Find active one to highlight
+    const activeBg = backgrounds.find(img => (img.tags || []).includes('active_bg'));
+    const activeId = activeBg ? activeBg.public_id : null;
+
+    backgrounds.forEach(img => {
+        const isActive = img.public_id === activeId;
+        const imageUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/c_fill,w_300,h_200/${img.public_id}`;
+
+        const el = document.createElement('div');
+        el.style.cssText = `position: relative; border: ${isActive ? '2px solid #50fa7b' : '1px solid var(--color-border)'}; border-radius: 8px; overflow: hidden; background: #000;`;
+
+        el.innerHTML = `
+            <img src="${imageUrl}" style="width: 100%; height: 120px; object-fit: cover; display: block; opacity: ${isActive ? '1' : '0.6'};">
+            <div style="padding: 0.5rem; display: flex; gap: 0.5rem;">
+                <button class="set-bg-btn" style="flex: 1; padding: 0.5rem; background: ${isActive ? '#50fa7b' : 'var(--color-surface)'}; color: ${isActive ? '#000' : 'var(--color-text-primary)'}; border: 1px solid var(--color-border); cursor: pointer; font-size: 0.8rem;">
+                    ${isActive ? 'Active' : 'Set Active'}
+                </button>
+                 <button class="delete-bg-btn" style="padding: 0.5rem; background: rgba(255, 0, 0, 0.2); color: red; border: 1px solid red; cursor: pointer;">
+                    🗑
+                </button>
+            </div>
+        `;
+
+        el.querySelector('.set-bg-btn').addEventListener('click', () => {
+            if (!isActive) setActiveBackground(img.public_id);
+        });
+
+        el.querySelector('.delete-bg-btn').addEventListener('click', async () => {
+            await deleteImage(img.public_id);
+            // Re-fetch since deleteImage updates allResources but we want to refresh this view
+            renderBackgroundGallery();
+        });
+
+        bgGallery.appendChild(el);
+    });
+}
+
+
+async function setActiveBackground(publicId) {
+    if (!confirm("Set this image as the site-wide background?")) return;
+
+    // Optimistic UI for immediate feedback
+    const imgUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/q_auto:good/${publicId}`;
+    document.body.style.backgroundImage = `url('${imgUrl}')`;
+    localStorage.setItem('kp_active_bg_url', imgUrl);
+
+    alert("Background updating... This might take a few seconds.");
+
+    try {
+        // 1. Remove 'active_bg' from old active image (if any)
+        const currentActive = allResources.find(img => (img.tags || []).includes('active_bg'));
+        if (currentActive && currentActive.public_id !== publicId) {
+            await toggleTag(currentActive.public_id, 'active_bg', false);
+            // Update local state
+            currentActive.tags = currentActive.tags.filter(t => t !== 'active_bg');
+        }
+
+        // 2. Add 'active_bg' to new image
+        await toggleTag(publicId, 'active_bg', true);
+
+        // Update local state
+        const newActive = allResources.find(img => img.public_id === publicId);
+        if (newActive) {
+            if (!newActive.tags) newActive.tags = [];
+            if (!newActive.tags.includes('active_bg')) newActive.tags.push('active_bg');
+        }
+
+        renderBackgroundGallery();
+
+    } catch (e) {
+        console.error("Set Background Failed", e);
+        alert("Failed to update background on server. Local preview is active.");
+    }
+}
+
+// Helper to add/remove tags via API
+async function toggleTag(publicId, tag, add) {
+    const timestamp = Math.round(Date.now() / 1000);
+
+    // Find resource to get current tags and context (must preserve them!)
+    const resource = allResources.find(r => r.public_id === publicId);
+    let currentTags = resource ? (resource.tags || []) : [];
+
+    if (add) {
+        if (!currentTags.includes(tag)) currentTags.push(tag);
+    } else {
+        currentTags = currentTags.filter(t => t !== tag);
+    }
+
+    const newTagStr = currentTags.join(',');
+
+    // Context preservation
+    let contextVal = "";
+    if (resource && resource.context && resource.context.custom) {
+        contextVal = Object.entries(resource.context.custom)
+            .map(([k, v]) => `${k}=${v}`)
+            .join('|');
+    }
+
+    const params = {
+        context: contextVal,
+        public_id: publicId,
+        tags: newTagStr,
+        timestamp: timestamp,
+        type: 'upload'
+    };
+
+    const signature = await generateSignature(params);
+
+    const formData = new FormData();
+    formData.append('public_id', publicId);
+    formData.append('type', 'upload');
+    formData.append('tags', newTagStr);
+    formData.append('context', contextVal);
+    formData.append('timestamp', timestamp);
+    formData.append('api_key', CLOUDINARY_API_KEY);
+    formData.append('signature', signature);
+
+    const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/explicit`, {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!resp.ok) throw new Error("Failed to update tags");
+}
+
+// Expose to window for admin.js access if needed
+window.renderBackgroundGallery = renderBackgroundGallery;
+
+// =============================================
 // 4. PUBLIC: Filter Logic (Home Page)
 // =============================================
 if (applyFiltersBtn) {
@@ -752,6 +965,10 @@ async function initProductsPage() {
 
         const filtered = allImages.filter(img => {
             const context = img.context?.custom || {};
+
+            // Filter out Backgrounds from product grid
+            if (context.category === 'Background' || (img.tags || []).includes('Background')) return false;
+
             const colorMatch = colors.length === 0 || colors.includes(context.color);
             const categoryMatch = categories.length === 0 || categories.includes(context.category);
             return colorMatch && categoryMatch;

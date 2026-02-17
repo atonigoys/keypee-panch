@@ -5,32 +5,110 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KEYPEE PANCH - Admin Dashboard</title>
-    <link rel="stylesheet" href="../style.css?v=22">
+    <link rel="stylesheet" href="../style.css?v=24">
+    <link rel="stylesheet" href="style.css?v=2">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 
 <body>
-    <div id="admin-page-wrapper" style="display: none;">
-        <header>
-            <div class="logo">KEYPEE PANCH <span
-                    style="font-size: 0.8rem; background: var(--color-text-primary); color: var(--color-bg); padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 10px;">ADMIN</span>
+
+    <!-- Sidebar Overlay for Mobile -->
+    <div id="sidebar-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999;">
+    </div>
+
+    <aside id="admin-sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-crown" style="margin-right: 0.5rem;"></i>
+                KEYPEE PANCH
             </div>
-            <nav>
-                <ul>
-                    <li><a href="../index.html">Home</a></li>
-                    <li><a href="../services.html">Services</a></li>
-                    <li><a href="../social.html">Social</a></li>
-                    <li><a href="../offer.html">Offer</a></li>
-                </ul>
-            </nav>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-tab="dashboard-section">
+                <i class="fas fa-chart-pie"></i>
+                Dashboard
+            </a>
+            <a href="#" class="nav-item" data-tab="upload-section">
+                <i class="fas fa-cloud-upload-alt"></i>
+                Upload Design
+            </a>
+            <a href="#" class="nav-item" data-tab="gallery-section">
+                <i class="fas fa-images"></i>
+                Gallery / Manage
+            </a>
+            <a href="#" class="nav-item" data-tab="background-section">
+                <i class="fas fa-image"></i>
+                Backgrounds
+            </a>
+
+            <div style="flex-grow: 1;"></div> <!-- Spacer -->
+
+            <a href="../index.html" class="nav-item">
+                <i class="fas fa-external-link-alt"></i>
+                Back to Website
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button id="logout-btn" class="logout-btn"
+                onclick="sessionStorage.removeItem('kp_admin'); window.location.href='../index.html';">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
+            </button>
+        </div>
+    </aside>
+
+    <main id="admin-main">
+        <header class="admin-header">
+            <button class="mobile-menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h2 style="font-size: 1.2rem; margin: 0; color: var(--color-text-primary);">Admin Panel</h2>
+            <div style="font-size: 0.9rem; color: #888;">
+                Logged in as Admin
+            </div>
         </header>
 
-        <main id="admin-content">
-            <div class="container">
-                <h1>Admin Dashboard</h1>
+        <div class="admin-content-wrapper">
 
-                <!-- Upload Section -->
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="tab-section active">
+                <h1 style="margin-bottom: 2rem;">Overview</h1>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-layer-group"></i></div>
+                        <div class="stat-value" id="stat-total-designs">0</div>
+                        <div class="stat-label">Total Designs</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-star"></i></div>
+                        <div class="stat-value" id="stat-total-featured">0</div>
+                        <div class="stat-label">Featured Items</div>
+                    </div>
+                </div>
+
+                <div class="shortcuts-grid">
+                    <div class="shortcut-btn" onclick="document.querySelector('[data-tab=\'upload-section\']').click()">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">+</div>
+                        <div>Upload New Design</div>
+                    </div>
+                    <div class="shortcut-btn"
+                        onclick="document.querySelector('[data-tab=\'gallery-section\']').click()">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;"><i class="fas fa-edit"></i></div>
+                        <div>Manage Gallery</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Upload Section -->
+            <section id="upload-section" class="tab-section" style="display: none;">
+                <h1 style="margin-bottom: 2rem;">Upload New Design</h1>
+
                 <div class="upload-container">
-                    <h2 style="margin-bottom: 1.5rem;">Upload New Design</h2>
                     <form id="upload-form" class="upload-form">
                         <div class="form-group">
                             <label>Category</label>
@@ -41,7 +119,6 @@
                                 <option value="Longsleeve">Longsleeve</option>
                                 <option value="Sleeveless">Sleeveless</option>
                                 <option value="Full Set Jersey">Full Set Jersey</option>
-
                                 <option value="Logo">Logo</option>
                             </select>
                         </div>
@@ -69,71 +146,87 @@
                             style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem; margin-bottom: 1rem;">
                             <input type="checkbox" id="upload-featured"
                                 style="width: auto; height: 1.2rem; width: 1.2rem; accent-color: var(--color-text-primary);">
-                            <label for="upload-featured" style="margin: 0; cursor: pointer;">Show in "Featured
-                                Designs"</label>
+                            <label for="upload-featured"
+                                style="margin: 0; cursor: pointer; color: var(--color-text-secondary);">Show in
+                                "Featured Designs"</label>
                         </div>
-                        <div>
+                        <div style="grid-column: 1 / -1;">
                             <button type="submit" class="btn" style="width: 100%;">Upload Design</button>
                         </div>
                     </form>
                 </div>
+            </section>
 
-                <!-- Recent Uploads Gallery -->
+            <!-- Gallery Section -->
+            <section id="gallery-section" class="tab-section" style="display: none;">
                 <div class="gallery-header">
-                    <h2 style="margin: 0;">All Images</h2>
+                    <h1 style="margin: 0;">Manage Gallery</h1>
                     <div id="gallery-filters" class="admin-filters">
                         <button class="gallery-filter active" data-filter="all"
-                            style="padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--color-text-primary); background: var(--color-text-primary); color: var(--color-bg); border-radius: 4px; flex-shrink: 0;">
-                            All
-                        </button>
+                            style="padding: 0.5rem 1rem; cursor: pointer; border: 1px solid var(--color-text-primary); background: var(--color-text-primary); color: #000; border-radius: 4px;">All</button>
                         <button class="gallery-filter" data-filter="featured"
-                            style="padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; border: 1px solid #ff69b4; background: transparent; color: #ff69b4; border-radius: 4px; flex-shrink: 0;">
-                            ⭐ Featured
-                        </button>
-                        <button class="gallery-filter" data-filter="cat:Shirt"
-                            style="padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--color-text-secondary); background: transparent; color: var(--color-text-secondary); border-radius: 4px; flex-shrink: 0;">
-                            Shirt
-                        </button>
-                        <button class="gallery-filter" data-filter="cat:Poloshirt"
-                            style="padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--color-text-secondary); background: transparent; color: var(--color-text-secondary); border-radius: 4px; flex-shrink: 0;">
-                            Poloshirt
-                        </button>
-                        <button class="gallery-filter" data-filter="cat:Longsleeve"
-                            style="padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--color-text-secondary); background: transparent; color: var(--color-text-secondary); border-radius: 4px; flex-shrink: 0;">
-                            Longsleeve
-                        </button>
-                        <button class="gallery-filter" data-filter="cat:Sleeveless"
-                            style="padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--color-text-secondary); background: transparent; color: var(--color-text-secondary); border-radius: 4px; flex-shrink: 0;">
-                            Sleeveless
-                        </button>
-                        <button class="gallery-filter" data-filter="cat:Full Set Jersey"
-                            style="padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--color-text-secondary); background: transparent; color: var(--color-text-secondary); border-radius: 4px; flex-shrink: 0;">
-                            Jersey
-                        </button>
-                        <button class="gallery-filter" data-filter="cat:Logo"
-                            style="padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; border: 1px solid var(--color-text-secondary); background: transparent; color: var(--color-text-secondary); border-radius: 4px; flex-shrink: 0;">
-                            Logo
-                        </button>
+                            style="padding: 0.5rem 1rem; cursor: pointer; border: 1px solid #ff69b4; background: transparent; color: #ff69b4; border-radius: 4px;">Featured</button>
                     </div>
-                    <span id="image-count"
-                        style="font-size: 0.8rem; color: var(--color-text-secondary); margin-left: auto;"></span>
                 </div>
+
+                <span id="image-count"
+                    style="display: block; margin-bottom: 1rem; color: #888; font-size: 0.9rem;"></span>
+
                 <div id="upload-gallery" class="admin-gallery-grid">
                     <p style="grid-column: 1/-1; color: var(--color-text-secondary); font-style: italic;">No images
                         uploaded yet.</p>
                 </div>
+            </section>
 
+            <!-- Background Section -->
+            <section id="background-section" class="tab-section" style="display: none;">
+                <h1 style="margin-bottom: 2rem;">Manage Backgrounds</h1>
 
+                <!-- 1. Visually Distinct Upload Area for Backgrounds -->
+                <div class="upload-container" style="border-color: var(--color-accent);">
+                    <h3 style="margin-bottom: 1rem; color: var(--color-accent);">Upload New Background</h3>
+                    <form id="upload-bg-form" class="upload-form">
+                        <!-- Hidden inputs to force category -->
+                        <input type="hidden" id="bg-category" value="Background">
 
-            </div>
-        </main>
+                        <div class="form-group">
+                            <label>Image File (High Res Recommended)</label>
+                            <input type="file" id="upload-bg-file" accept="image/*" required>
+                        </div>
 
-        <footer>
-            <p>&copy; 2026 KEYPEE PANCH. All rights reserved.</p>
-        </footer>
-    </div>
+                        <div style="grid-column: 1 / -1;">
+                            <button type="submit" class="btn"
+                                style="width: 100%; background-color: var(--color-accent);">Upload Background
+                                Image</button>
+                        </div>
+                    </form>
+                </div>
 
-    <script src="../script.js?v=23"></script>
+                <!-- 2. List of Background Images -->
+                <h3>Select Active Background</h3>
+                <p style="color: #888; font-size: 0.9rem; margin-bottom: 1rem;">The selected image will be applied to
+                    the entire website.</p>
+
+                <div id="background-gallery" class="admin-gallery-grid">
+                    <!-- JS will populate this -->
+                    <p style="grid-column: 1/-1; color: var(--color-text-secondary);">Loading backgrounds...</p>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <!-- Order matters: script.js (core logic + cloudinary) -> admin.js (dashboard logic) -->
+    <script src="../script.js?v=24"></script>
+    <script src="admin.js?v=1"></script>
+
+    <script>
+        // Inline check for auth to prevent flash of content
+        if (!sessionStorage.getItem('kp_admin')) {
+            window.location.href = '../login.html';
+        }
+    </script>
 </body>
 
 </html>
