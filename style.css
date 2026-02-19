@@ -536,3 +536,14 @@ footer {
         display: none !important;
     }
 }
+
+/* Utility Class for Hover Glow */
+.text-hover-glow {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.text-hover-glow:hover {
+    color: var(--color-text-secondary);
+    text-shadow: 0 0 8px var(--color-accent);
+}
